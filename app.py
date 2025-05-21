@@ -26,7 +26,7 @@ st.markdown("""
     5.  **Aplicar OCR:** Converta PDFs baseados em imagem em PDFs pesquisáveis (requer Tesseract OCR e pacote de idioma português instalados no ambiente do servidor).
 """)
 
-# --- Dicionário Padrão para o Estado da Sessão ---
+# --- Dicionário Padrão para o Estado da Sessão (DEFINIDO FORA DA FUNÇÃO) ---
 DEFAULT_STATE = {
     'pdf_doc_bytes_original': None, 'pdf_name': None, 'bookmarks_data': [],
     'processed_pdf_bytes_remove': None, 'processed_pdf_bytes_extract': None, 
@@ -35,7 +35,8 @@ DEFAULT_STATE = {
     'page_previews': [], 'visual_page_selection': {}, 
     'processing_remove': False, 'processing_split': False, 'processing_extract': False, 
     'processing_visual_delete': False, 'processing_visual_extract': False, 'processing_ocr': False,
-    'active_tab_for_preview': None, 'generating_previews': False
+    'active_tab_for_preview': None, 'generating_previews': False,
+    'current_page_count_for_inputs': 0 # Para validar inputs de página
 }
 
 # --- Cache para Carregamento do PDF ---
@@ -43,17 +44,15 @@ DEFAULT_STATE = {
 def load_pdf_from_bytes(pdf_bytes, filename="uploaded_pdf"):
     try:
         doc = fitz.open(stream=pdf_bytes, filetype="pdf")
-        # Realizar operações que só dependem do doc aqui para aproveitar o cache
         bookmarks = get_bookmark_ranges(doc) 
         page_count = doc.page_count
-        # Retornar o objeto doc e os dados extraídos
         return doc, bookmarks, page_count
     except Exception as e:
         st.error(f"Erro ao carregar o PDF '{filename}': {e}")
         return None, [], 0
 
 # --- Funções Auxiliares ---
-def get_bookmark_ranges(pdf_doc_instance): # Recebe a instância do documento
+def get_bookmark_ranges(pdf_doc_instance):
     bookmarks_data = []
     if not pdf_doc_instance: return bookmarks_data
     try:
@@ -85,7 +84,6 @@ def get_bookmark_ranges(pdf_doc_instance): # Recebe a instância do documento
     return bookmarks_data
 
 def parse_page_input(page_str, max_page_1_idx):
-    # ... (mantida como antes)
     selected_pages_0_indexed = set()
     if not page_str.strip(): return []
     parts = page_str.split(',')
@@ -106,16 +104,15 @@ def parse_page_input(page_str, max_page_1_idx):
         except ValueError: st.warning(f"Aviso: Entrada de página inválida '{part}'. Será ignorada.")
     return sorted(list(selected_pages_0_indexed))
 
-
 def apply_ocr_to_doc(doc_to_ocr):
     if not OCR_AVAILABLE:
         st.warning("Funcionalidade de OCR não está disponível (Tesseract OCR não configurado no servidor). O PDF será salvo sem OCR.")
         return False
     try:
-        is_already_searchable = all(page.get_text("text") for page in doc_to_ocr)
-        if is_already_searchable:
+        is_already_searchable = all(page.get_text("text") for page in doc_to_ocr if doc_to_ocr and len(doc_to_ocr) > 0) # Adicionado if doc_to_ocr
+        if is_already_searchable and len(doc_to_ocr) > 0: # Adicionado if len(doc_to_ocr) > 0
             st.info("O PDF já parece ser pesquisável. OCR não será reaplicado.")
-            return False # Indica que não houve necessidade de aplicar OCR
+            return False 
 
         total_pages = len(doc_to_ocr)
         if total_pages == 0:
@@ -126,12 +123,10 @@ def apply_ocr_to_doc(doc_to_ocr):
         ocr_progress_bar = st.progress(0, text=ocr_progress_text)
         
         if hasattr(doc_to_ocr, "ocr_pdf"):
-            # Simular progresso, pois ocr_pdf não tem callback direto
-            # Poderia ser mais granular se processássemos página a página, mas ocr_pdf é mais otimizado
-            doc_to_ocr.ocr_pdf(language="por")
+            doc_to_ocr.ocr_pdf(language="por") 
             ocr_progress_bar.progress(100, text="OCR Aplicado!")
             st.success("OCR aplicado com sucesso!")
-            return True # OCR foi aplicado
+            return True
         else:
             st.warning("Método `ocr_pdf` não encontrado no PyMuPDF. A funcionalidade de OCR pode não estar disponível ou requer uma versão mais recente do PyMuPDF. Verifique também se o Tesseract OCR está instalado no servidor.")
             ocr_progress_bar.empty()
@@ -139,18 +134,19 @@ def apply_ocr_to_doc(doc_to_ocr):
     except Exception as e:
         st.error(f"Erro durante o processo de OCR: {e}. Verifique se o Tesseract OCR e o pacote de idioma 'por' estão instalados no servidor. O PDF será salvo sem OCR adicional.")
         if 'ocr_progress_bar' in locals(): ocr_progress_bar.empty()
-        return False # OCR falhou
+        return False
 
 # --- Inicialização do Estado da Sessão ---
 def initialize_session_state():
-    for key, value in DEFAULT_STATE.items():
+    for key, value in DEFAULT_STATE.items(): # Usa o DEFAULT_STATE global
         if key not in st.session_state:
-            st.session_state[key] = value if not isinstance(value, (list, dict, set)) else type(value)()
+            # Para tipos mutáveis, cria uma nova instância vazia
+            st.session_state[key] = type(value)() if isinstance(value, (list, dict, set)) else value
 initialize_session_state()
 
 # --- Botão para Limpar Estado ---
-if st.sidebar.button("Limpar PDF Carregado e Seleções", key="clear_all_sidebar_btn_v7"):
-    for key in DEFAULT_STATE.keys(): # Itera sobre as chaves do dicionário padrão
+if st.sidebar.button("Limpar PDF Carregado e Seleções", key="clear_all_sidebar_btn_v7_fixed"):
+    for key in DEFAULT_STATE.keys():
         if key in ['bookmarks_data', 'split_pdf_parts', 'page_previews']: st.session_state[key] = []
         elif key == 'visual_page_selection': st.session_state[key] = {}
         elif key.startswith('processing_'): st.session_state[key] = False
@@ -160,12 +156,12 @@ if st.sidebar.button("Limpar PDF Carregado e Seleções", key="clear_all_sidebar
     for k_del in dynamic_keys:
         if k_del in st.session_state: del st.session_state[k_del]
     
-    load_pdf_from_bytes.clear() # Limpa o cache da função de carregamento
+    load_pdf_from_bytes.clear() 
     st.success("Estado da aplicação limpo!")
     st.rerun()
 
 # --- Upload do Arquivo ---
-uploaded_file = st.file_uploader("Carregue seu arquivo PDF", type="pdf", key="pdf_uploader_main_v7")
+uploaded_file = st.file_uploader("Carregue seu arquivo PDF", type="pdf", key="pdf_uploader_main_v7_fixed")
 
 if uploaded_file is not None:
     if st.session_state.last_uploaded_filename != uploaded_file.name:
@@ -173,8 +169,7 @@ if uploaded_file is not None:
         st.session_state.pdf_name = uploaded_file.name
         st.session_state.last_uploaded_filename = uploaded_file.name
         
-        # Resetar estados que dependem do PDF carregado
-        for key in DEFAULT_STATE.keys(): # Reseta para o padrão, exceto o que foi carregado
+        for key in DEFAULT_STATE.keys():
             if key not in ['pdf_doc_bytes_original', 'pdf_name', 'last_uploaded_filename']:
                 if key in ['bookmarks_data', 'split_pdf_parts', 'page_previews']: st.session_state[key] = []
                 elif key == 'visual_page_selection': st.session_state[key] = {}
@@ -185,47 +180,211 @@ if uploaded_file is not None:
         for k_del in keys_to_delete:
             if k_del in st.session_state: del st.session_state[k_del]
         
-        load_pdf_from_bytes.clear() # Limpa o cache antes de carregar o novo
-        doc, bookmarks, page_count = load_pdf_from_bytes(st.session_state.pdf_doc_bytes_original, st.session_state.pdf_name)
-        if doc:
+        load_pdf_from_bytes.clear()
+        doc_data = load_pdf_from_bytes(st.session_state.pdf_doc_bytes_original, st.session_state.pdf_name)
+        if doc_data and doc_data[0]: # Verifica se doc_data e doc_data[0] (o documento) não são None
+            _, bookmarks, page_count = doc_data
             st.info(f"PDF '{st.session_state.pdf_name}' carregado com {page_count} páginas.")
             st.session_state.bookmarks_data = bookmarks
+            st.session_state.current_page_count_for_inputs = page_count
         else:
             st.session_state.pdf_doc_bytes_original = None
+            st.session_state.current_page_count_for_inputs = 0
 else:
     if st.session_state.last_uploaded_filename is not None:
         st.session_state.pdf_doc_bytes_original = None
         st.session_state.last_uploaded_filename = None
+        st.session_state.current_page_count_for_inputs = 0
         load_pdf_from_bytes.clear()
 
 # --- Abas para diferentes funcionalidades ---
 if st.session_state.pdf_doc_bytes_original:
-    doc_cached, _, _ = load_pdf_from_bytes(st.session_state.pdf_doc_bytes_original, st.session_state.pdf_name)
-    if not doc_cached:
-        st.error("Não foi possível carregar o documento PDF para processamento.")
+    doc_cached_data = load_pdf_from_bytes(st.session_state.pdf_doc_bytes_original, st.session_state.pdf_name)
+    if not doc_cached_data or not doc_cached_data[0]:
+        st.error("Não foi possível carregar o documento PDF em cache para processamento.")
     else:
+        doc_cached, _, _ = doc_cached_data # Desempacota o documento do resultado do cache
         active_tabs = ["Remover Páginas", "Dividir PDF", "Extrair Páginas", "Gerir Páginas Visualmente", "Aplicar OCR"]
-        selected_tab = st.tabs(active_tabs)
+        
+        # Usar st.query_params para tentar manter a aba ativa entre reruns (opcional, mas bom para UX)
+        query_params = st.query_params
+        default_tab_index = active_tabs.index(query_params.get("tab", [active_tabs[0]])[0]) if query_params.get("tab") else 0
+        
+        # A função st.tabs não retorna a aba ativa diretamente, então precisamos de um truque
+        # ou de um componente de abas personalizado se quisermos saber qual aba está ativa.
+        # Por simplicidade, vamos assumir que o usuário seleciona a aba e o conteúdo é renderizado.
+        # Para o download, vamos diferenciar os botões de download por chaves únicas e verificar qual botão foi pressionado.
+
+        tab_remove, tab_split, tab_extract, tab_visual_manage, tab_ocr = st.tabs(active_tabs)
 
         # --- ABA: REMOVER PÁGINAS ---
-        with selected_tab[0]: # Corresponde a "Remover Páginas"
-            # ... (Lógica da aba remover, usando doc_cached e st.progress)
-            # ... Similar à v6, mas com a barra de progresso e usando o doc_cached para operações
+        with tab_remove:
             st.header("Remover Páginas do PDF")
-            # ... (Implementação completa omitida para brevidade, mas seguiria o padrão da v6
-            #      com as melhorias de UX e usando doc_cached.get_stream() para criar cópias modificáveis)
+            with st.expander("Excluir por Marcadores", expanded=True):
+                if st.session_state.bookmarks_data:
+                    st.markdown("Selecione os marcadores cujos intervalos de páginas você deseja excluir.")
+                    with st.container(height=300):
+                        for bm in st.session_state.bookmarks_data:
+                            checkbox_key = f"delete_bookmark_{bm['id']}_tab_remove_v7"
+                            if checkbox_key not in st.session_state: st.session_state[checkbox_key] = False
+                            st.checkbox(label=bm['display_text'], value=st.session_state[checkbox_key], key=checkbox_key)
+                else:
+                    st.info("Nenhum marcador encontrado neste PDF para seleção.")
+
+            with st.expander("Excluir por Números de Página", expanded=True):
+                direct_pages_str_tab_remove = st.text_input("Páginas a excluir (ex: 1, 3-5, 8):", key="direct_pages_input_tab_remove_v7")
+            
+            optimize_pdf_remove = st.checkbox("Otimizar PDF ao salvar", value=True, key="optimize_pdf_remove_checkbox_tab_remove_v7")
+            ocr_pdf_remove = st.checkbox("Tornar PDF pesquisável (OCR - Português)", value=False, key="ocr_pdf_remove_checkbox_tab_remove_v7", help="Requer Tesseract. Pode demorar.")
+            
+            if st.button("Processar Remoção de Páginas", key="process_remove_button_tab_remove_v7", disabled=st.session_state.get('processing_remove', False)):
+                st.session_state.processing_remove = True
+                st.session_state.processed_pdf_bytes_remove = None; st.session_state.error_message = None
+                
+                with st.spinner("A processar remoção de páginas... Por favor, aguarde."):
+                    doc_to_modify = None
+                    try:
+                        doc_to_modify = fitz.open(stream=doc_cached.write(), filetype="pdf")
+                        selected_bookmark_pages_to_delete = set()
+                        if st.session_state.bookmarks_data:
+                            for bm in st.session_state.bookmarks_data:
+                                if st.session_state.get(f"delete_bookmark_{bm['id']}_tab_remove_v7", False):
+                                    for page_num in range(bm["start_page_0_idx"], bm["end_page_0_idx"] + 1):
+                                        selected_bookmark_pages_to_delete.add(page_num)
+                        direct_pages_to_delete_list = parse_page_input(direct_pages_str_tab_remove, doc_to_modify.page_count)
+                        all_pages_to_delete_0_indexed = sorted(list(selected_bookmark_pages_to_delete.union(set(direct_pages_to_delete_list))))
+
+                        if not all_pages_to_delete_0_indexed: st.warning("Nenhuma página selecionada para exclusão.")
+                        elif len(all_pages_to_delete_0_indexed) >= doc_to_modify.page_count:
+                            st.session_state.error_message = "Erro: Não é permitido excluir todas as páginas."; st.error(st.session_state.error_message)
+                        else:
+                            doc_to_modify.delete_pages(all_pages_to_delete_0_indexed)
+                            if ocr_pdf_remove: apply_ocr_to_doc(doc_to_modify)
+                            
+                            save_options = {"garbage": 4, "deflate": True, "clean": True}
+                            if optimize_pdf_remove: save_options.update({"deflate_images": True, "deflate_fonts": True})
+                            pdf_output_buffer = io.BytesIO()
+                            doc_to_modify.save(pdf_output_buffer, **save_options)
+                            st.session_state.processed_pdf_bytes_remove = pdf_output_buffer.getvalue()
+                            st.success(f"PDF processado! {len(all_pages_to_delete_0_indexed)} página(s) removida(s).")
+                    except Exception as e: st.session_state.error_message = f"Erro ao remover páginas: {e}"; st.error(st.session_state.error_message)
+                    finally: 
+                        if doc_to_modify: doc_to_modify.close()
+                st.session_state.processing_remove = False
+                st.rerun()
+
+            if st.session_state.processed_pdf_bytes_remove:
+                download_filename_remove = f"{os.path.splitext(st.session_state.pdf_name)[0]}_editado.pdf"
+                st.download_button(label="Baixar PDF Editado", data=st.session_state.processed_pdf_bytes_remove, file_name=download_filename_remove, mime="application/pdf", key="download_remove_button_tab_remove_v7")
 
         # --- ABA: DIVIDIR PDF ---
-        with selected_tab[1]:
+        with tab_split:
             st.header("Dividir PDF")
-            # ... (Lógica da aba dividir, com st.progress)
-            st.info("Funcionalidade de Divisão de PDF: Lógica de processamento e barra de progresso a serem implementadas aqui.")
+            split_method = st.radio("Método de Divisão:", ("Por Tamanho Máximo (MB)", "A Cada N Páginas"), key="split_method_radio_tab_split_v7")
+            optimize_pdf_split = st.checkbox("Otimizar partes divididas", value=True, key="optimize_pdf_split_checkbox_tab_split_v7")
+            ocr_pdf_split = st.checkbox("Tornar partes pesquisáveis (OCR - Português)", value=False, key="ocr_pdf_split_checkbox_tab_split_v7", help="Requer Tesseract. Pode demorar.")
+            
+            if split_method == "Por Tamanho Máximo (MB)":
+                max_size_mb = st.number_input("Tamanho máximo por parte (MB):", min_value=0.1, value=5.0, step=0.1, format="%.1f", key="max_size_mb_input_tab_split_v7")
+                if st.button("Dividir por Tamanho", key="split_by_size_button_tab_split_v7", disabled=st.session_state.get('processing_split', False)):
+                    st.session_state.processing_split = True
+                    st.session_state.split_pdf_parts = [] ; st.session_state.error_message = None
+                    progress_bar_split_size = st.progress(0, text="Iniciando divisão por tamanho...")
+                    with st.spinner("A dividir PDF por tamanho... Por favor, aguarde."):
+                        max_size_bytes = int(max_size_mb * 1024 * 1024)
+                        original_doc_for_split = None
+                        try:
+                            original_doc_for_split = fitz.open(stream=doc_cached.write(), filetype="pdf")
+                            total_pages_original = original_doc_for_split.page_count; current_page_index = 0; part_number = 1
+                            
+                            while current_page_index < total_pages_original:
+                                progress_bar_split_size.progress(int((current_page_index / total_pages_original) * 100) if total_pages_original > 0 else 0 , text=f"Processando página {current_page_index+1}/{total_pages_original} para parte {part_number}...")
+                                new_part_doc = fitz.open(); pages_in_current_part = 0
+                                while current_page_index < total_pages_original:
+                                    temp_doc_for_size_check = fitz.open()
+                                    if pages_in_current_part > 0: temp_doc_for_size_check.insert_pdf(new_part_doc)
+                                    temp_doc_for_size_check.insert_pdf(original_doc_for_split, from_page=current_page_index, to_page=current_page_index)
+                                    temp_buffer = io.BytesIO()
+                                    save_options_check = {"garbage": 0, "deflate": optimize_pdf_split}
+                                    if optimize_pdf_split: save_options_check.update({"deflate_images": True, "deflate_fonts": True})
+                                    temp_doc_for_size_check.save(temp_buffer, **save_options_check)
+                                    estimated_size = len(temp_buffer.getvalue()); temp_doc_for_size_check.close(); temp_buffer.close()
+                                    if pages_in_current_part > 0 and estimated_size > max_size_bytes: break 
+                                    new_part_doc.insert_pdf(original_doc_for_split, from_page=current_page_index, to_page=current_page_index)
+                                    current_page_index += 1; pages_in_current_part += 1
+                                    if estimated_size > max_size_bytes and pages_in_current_part == 1:
+                                        st.warning(f"Página {current_page_index} excede o limite. Será parte separada."); break
+                                if pages_in_current_part > 0:
+                                    if ocr_pdf_split: apply_ocr_to_doc(new_part_doc)
+                                    part_buffer = io.BytesIO()
+                                    final_save_options = {"garbage": 4, "deflate": True, "clean": True}
+                                    if optimize_pdf_split: final_save_options.update({"deflate_images": True, "deflate_fonts": True})
+                                    new_part_doc.save(part_buffer, **final_save_options); part_buffer.seek(0)
+                                    part_filename = f"{os.path.splitext(st.session_state.pdf_name)[0]}_parteT{part_number}.pdf"
+                                    st.session_state.split_pdf_parts.append({"name": part_filename, "data": part_buffer.getvalue()})
+                                    part_number += 1
+                                new_part_doc.close()
+                            if st.session_state.split_pdf_parts: st.success(f"PDF dividido em {len(st.session_state.split_pdf_parts)} partes!")
+                            else: st.warning("Não foi possível dividir o PDF.")
+                        except Exception as e: st.session_state.error_message = f"Erro ao dividir PDF: {e}"; st.error(st.session_state.error_message)
+                        finally:
+                            if original_doc_for_split: original_doc_for_split.close()
+                            progress_bar_split_size.empty()
+                    st.session_state.processing_split = False
+                    st.rerun()
 
+            elif split_method == "A Cada N Páginas":
+                pages_per_split = st.number_input("Número de páginas por parte:", min_value=1, value=10, step=1, key="pages_per_split_input_tab_split_v7")
+                if st.button("Dividir por Número de Páginas", key="split_by_count_button_tab_split_v7", disabled=st.session_state.get('processing_split', False)):
+                    st.session_state.processing_split = True
+                    st.session_state.split_pdf_parts = []; st.session_state.error_message = None
+                    progress_bar_split_count = st.progress(0, text="Iniciando divisão por contagem...")
+                    with st.spinner("A dividir PDF por número de páginas... Por favor, aguarde."):
+                        original_doc_for_split_count = None
+                        try:
+                            original_doc_for_split_count = fitz.open(stream=doc_cached.write(), filetype="pdf")
+                            total_pages_original = original_doc_for_split_count.page_count; part_number = 1
+                            num_parts_expected = (total_pages_original + pages_per_split - 1) // pages_per_split
 
+                            for i in range(0, total_pages_original, pages_per_split):
+                                progress_bar_split_count.progress(int((part_number / num_parts_expected) * 100) if num_parts_expected > 0 else 0, text=f"Criando parte {part_number}/{num_parts_expected}...")
+                                new_part_doc = fitz.open()
+                                start_page = i; end_page = min(i + pages_per_split - 1, total_pages_original - 1)
+                                new_part_doc.insert_pdf(original_doc_for_split_count, from_page=start_page, to_page=end_page)
+                                if ocr_pdf_split: apply_ocr_to_doc(new_part_doc)
+                                part_buffer = io.BytesIO()
+                                final_save_options = {"garbage": 4, "deflate": True, "clean": True}
+                                if optimize_pdf_split: final_save_options.update({"deflate_images": True, "deflate_fonts": True})
+                                new_part_doc.save(part_buffer, **final_save_options); part_buffer.seek(0)
+                                part_filename = f"{os.path.splitext(st.session_state.pdf_name)[0]}_parteN{part_number}.pdf"
+                                st.session_state.split_pdf_parts.append({"name": part_filename, "data": part_buffer.getvalue()})
+                                part_number += 1; new_part_doc.close()
+                            if st.session_state.split_pdf_parts: st.success(f"PDF dividido em {len(st.session_state.split_pdf_parts)} partes!")
+                            else: st.warning("Não foi possível dividir o PDF.")
+                        except Exception as e: st.session_state.error_message = f"Erro ao dividir PDF: {e}"; st.error(st.session_state.error_message)
+                        finally:
+                            if original_doc_for_split_count: original_doc_for_split_count.close()
+                            progress_bar_split_count.empty()
+                    st.session_state.processing_split = False
+                    st.rerun()
+
+            if st.session_state.split_pdf_parts:
+                st.subheader("Baixar Partes do PDF Dividido:")
+                if len(st.session_state.split_pdf_parts) > 1:
+                    zip_buffer = io.BytesIO()
+                    with st.spinner("A preparar ZIP das partes..."):
+                        with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED, False) as zip_file:
+                            for part in st.session_state.split_pdf_parts:
+                                zip_file.writestr(part["name"], part["data"])
+                        zip_buffer.seek(0)
+                    st.download_button(label=f"Baixar Todas as Partes ({len(st.session_state.split_pdf_parts)}) como ZIP", data=zip_buffer, file_name=f"{os.path.splitext(st.session_state.pdf_name)[0]}_partes.zip", mime="application/zip", key="download_zip_button_tab_split_v7")
+                    st.markdown("---")
+                for i, part in enumerate(st.session_state.split_pdf_parts):
+                    st.download_button(label=f"Baixar {part['name']}", data=part["data"], file_name=part["name"], mime="application/pdf", key=f"download_part_{i}_button_tab_split_v7")
+        
         # --- ABA: EXTRAIR PÁGINAS ---
-        with selected_tab[2]:
+        with selected_tab[2]: # Corresponde a "Extrair Páginas"
             st.header("Extrair Páginas Específicas")
-            # ... (Lógica da aba extrair, com st.progress)
             extract_pages_str = st.text_input("Páginas a extrair (ex: 1, 3-5, 8):", key="extract_pages_input_tab_extract_v7")
             optimize_pdf_extract = st.checkbox("Otimizar PDF extraído", value=True, key="optimize_pdf_extract_checkbox_tab_extract_v7")
             ocr_pdf_extract = st.checkbox("Tornar PDF pesquisável (OCR - Português)", value=False, key="ocr_pdf_extract_checkbox_tab_extract_v7", help="Requer Tesseract. Pode demorar.")
@@ -234,16 +393,17 @@ if st.session_state.pdf_doc_bytes_original:
                 st.session_state.processing_extract = True
                 st.session_state.processed_pdf_bytes_extract = None; st.session_state.error_message = None
                 
-                doc_original_copy = fitz.open(stream=doc_cached.write(), filetype="pdf") # Cópia para modificação
-
+                doc_original_for_extract = None
+                new_extracted_doc = None
                 with st.spinner("A extrair páginas... Por favor, aguarde."):
-                    pages_to_extract_0_indexed = parse_page_input(extract_pages_str, doc_original_copy.page_count)
-                    if not pages_to_extract_0_indexed: st.warning("Nenhuma página especificada para extração.")
-                    else:
-                        try:
+                    try:
+                        doc_original_for_extract = fitz.open(stream=doc_cached.write(), filetype="pdf") # Cópia para não modificar o cache
+                        pages_to_extract_0_indexed = parse_page_input(extract_pages_str, doc_original_for_extract.page_count)
+                        if not pages_to_extract_0_indexed: st.warning("Nenhuma página especificada para extração.")
+                        else:
                             new_extracted_doc = fitz.open()
-                            # Correção: Usar insert_pdf com selected_pages
-                            new_extracted_doc.insert_pdf(doc_original_copy, selected_pages=pages_to_extract_0_indexed)
+                            # selected_pages espera uma lista de inteiros 0-indexados
+                            new_extracted_doc.insert_pdf(doc_original_for_extract, selected_pages=pages_to_extract_0_indexed) 
                             
                             if ocr_pdf_extract: apply_ocr_to_doc(new_extracted_doc)
                             save_options = {"garbage": 4, "deflate": True, "clean": True}
@@ -252,9 +412,10 @@ if st.session_state.pdf_doc_bytes_original:
                             new_extracted_doc.save(pdf_output_buffer, **save_options); pdf_output_buffer.seek(0)
                             st.session_state.processed_pdf_bytes_extract = pdf_output_buffer.getvalue()
                             st.success(f"PDF com {len(pages_to_extract_0_indexed)} página(s) extraída(s) pronto!")
-                            new_extracted_doc.close()
-                        except Exception as e: st.session_state.error_message = f"Erro ao extrair páginas: {e}"; st.error(st.session_state.error_message)
-                        finally: doc_original_copy.close()
+                    except Exception as e: st.session_state.error_message = f"Erro ao extrair páginas: {e}"; st.error(st.session_state.error_message)
+                    finally: 
+                        if doc_original_for_extract: doc_original_for_extract.close()
+                        if new_extracted_doc: new_extracted_doc.close()
                 st.session_state.processing_extract = False
                 st.rerun()
             
@@ -262,9 +423,8 @@ if st.session_state.pdf_doc_bytes_original:
                 download_filename_extract = f"{os.path.splitext(st.session_state.pdf_name)[0]}_extraido.pdf"
                 st.download_button(label="Baixar PDF Extraído", data=st.session_state.processed_pdf_bytes_extract, file_name=download_filename_extract, mime="application/pdf", key="download_extract_button_tab_extract_v7")
 
-
         # --- ABA: GERIR PÁGINAS VISUALMENTE ---
-        with selected_tab[3]:
+        with selected_tab[3]: # Corresponde a "Gerir Páginas Visualmente"
             st.header("Gerir Páginas Visualmente")
             if st.session_state.active_tab_for_preview != "visual_manage" or not st.session_state.page_previews:
                 if not st.session_state.page_previews and doc_cached and not st.session_state.generating_previews:
@@ -284,18 +444,89 @@ if st.session_state.pdf_doc_bytes_original:
                         st.session_state.page_previews = previews
                         preview_progress.empty()
                     st.session_state.generating_previews = False
-                    st.session_state.active_tab_for_preview = "visual_manage" # Marca que as previews para esta aba foram geradas
-                    st.rerun() # Rerun para exibir as previews agora que foram geradas
+                    st.session_state.active_tab_for_preview = "visual_manage"
+                    st.rerun() 
             
             if not st.session_state.page_previews:
                 st.info("Clique novamente nesta aba ou carregue um PDF para gerar as pré-visualizações.")
             else:
-                # ... (Lógica da aba visual, adaptada para usar doc_cached e o novo st.session_state.visual_page_selection)
-                st.info("Funcionalidade de Gerir Páginas Visualmente: Lógica de seleção e ações a serem implementadas aqui.")
+                st.markdown(f"Total de páginas: {len(st.session_state.page_previews)}. Selecione as páginas abaixo:")
+                num_cols_preview = st.sidebar.slider("Colunas para pré-visualização:", 2, 8, 4, key="preview_cols_slider_v7")
+                cols = st.columns(num_cols_preview)
+                
+                for i, img_bytes in enumerate(st.session_state.page_previews):
+                    with cols[i % num_cols_preview]:
+                        page_key = f"select_page_preview_{i}_v7" 
+                        if i not in st.session_state.visual_page_selection:
+                            st.session_state.visual_page_selection[i] = False
+                        st.image(img_bytes, caption=f"Página {i+1}", width=120)
+                        st.session_state.visual_page_selection[i] = st.checkbox("Selecionar", value=st.session_state.visual_page_selection[i], key=page_key)
+                
+                selected_page_indices = sorted([k for k, v in st.session_state.visual_page_selection.items() if v])
+                st.markdown(f"**Páginas selecionadas (0-indexadas):** {selected_page_indices if selected_page_indices else 'Nenhuma'}")
 
+                col_action1, col_action2 = st.columns(2)
+                with col_action1:
+                    if st.button("Excluir Páginas Selecionadas", key="delete_visual_button_tab_visual_v7", disabled=st.session_state.get('processing_visual_delete', False)):
+                        st.session_state.processing_visual_delete = True
+                        st.session_state.processed_pdf_bytes_visual = None; st.session_state.error_message = None
+                        if not selected_page_indices: st.warning("Nenhuma página selecionada para exclusão.")
+                        else:
+                            with st.spinner("A excluir páginas selecionadas..."):
+                                doc_to_modify_vis = None
+                                try:
+                                    doc_to_modify_vis = fitz.open(stream=doc_cached.write(), filetype="pdf")
+                                    if len(selected_page_indices) >= doc_to_modify_vis.page_count: st.error("Não é permitido excluir todas as páginas.")
+                                    else:
+                                        doc_to_modify_vis.delete_pages(selected_page_indices)
+                                        save_options = {"garbage": 4, "deflate": True, "clean": True}
+                                        pdf_output_buffer = io.BytesIO()
+                                        doc_to_modify_vis.save(pdf_output_buffer, **save_options)
+                                        st.session_state.processed_pdf_bytes_visual = pdf_output_buffer.getvalue()
+                                        st.success(f"{len(selected_page_indices)} página(s) excluída(s)!")
+                                        st.session_state.visual_page_selection = {} # Limpa seleção
+                                except Exception as e: st.error(f"Erro ao excluir páginas: {e}")
+                                finally: 
+                                    if doc_to_modify_vis: doc_to_modify_vis.close()
+                        st.session_state.processing_visual_delete = False
+                        st.rerun()
+
+                with col_action2:
+                    if st.button("Extrair Páginas Selecionadas", key="extract_visual_button_tab_visual_v7", disabled=st.session_state.get('processing_visual_extract', False)):
+                        st.session_state.processing_visual_extract = True
+                        st.session_state.processed_pdf_bytes_visual = None; st.session_state.error_message = None
+                        if not selected_page_indices: st.warning("Nenhuma página selecionada para extração.")
+                        else:
+                            with st.spinner("A extrair páginas selecionadas..."):
+                                doc_original_vis = None; new_doc_vis = None
+                                try:
+                                    doc_original_vis = fitz.open(stream=doc_cached.write(), filetype="pdf")
+                                    new_doc_vis = fitz.open()
+                                    new_doc_vis.insert_pdf(doc_original_vis, selected_pages=selected_page_indices)
+                                    save_options = {"garbage": 4, "deflate": True, "clean": True}
+                                    pdf_output_buffer = io.BytesIO()
+                                    new_doc_vis.save(pdf_output_buffer, **save_options)
+                                    st.session_state.processed_pdf_bytes_visual = pdf_output_buffer.getvalue()
+                                    st.success(f"{len(selected_page_indices)} página(s) extraída(s)!")
+                                    st.session_state.visual_page_selection = {} # Limpa seleção
+                                except Exception as e: st.error(f"Erro ao extrair páginas: {e}")
+                                finally:
+                                    if doc_original_vis: doc_original_vis.close()
+                                    if new_doc_vis: new_doc_vis.close()
+                        st.session_state.processing_visual_extract = False
+                        st.rerun()
+                
+                if st.session_state.processed_pdf_bytes_visual:
+                    action_type_visual = "excluido_vis" if st.session_state.get('delete_visual_button_tab_visual_v7') else "extraido_vis"
+                    download_filename_visual = f"{os.path.splitext(st.session_state.pdf_name)[0]}_{action_type_visual}.pdf"
+                    st.download_button(
+                        label=f"Baixar PDF ({action_type_visual.replace('_', ' ')})", 
+                        data=st.session_state.processed_pdf_bytes_visual,
+                        file_name=download_filename_visual, mime="application/pdf", key="download_visual_button_tab_visual_v7"
+                    )
 
         # --- ABA: APLICAR OCR ---
-        with selected_tab[4]:
+        with selected_tab[4]: # Corresponde a "Aplicar OCR"
             st.header("Aplicar OCR ao PDF Inteiro")
             st.markdown("Esta funcionalidade tentará tornar o texto do seu PDF pesquisável. O PDF original não será alterado; um novo PDF com OCR será gerado para download.")
             
@@ -308,12 +539,12 @@ if st.session_state.pdf_doc_bytes_original:
                 st.session_state.processing_ocr = True
                 st.session_state.processed_pdf_bytes_ocr = None; st.session_state.error_message = None
                 
-                doc_for_ocr = fitz.open(stream=doc_cached.write(), filetype="pdf") # Cópia para OCR
-
-                ocr_applied_successfully = apply_ocr_to_doc(doc_for_ocr)
-                
-                if doc_for_ocr: # Mesmo se o OCR falhar, tentamos salvar o documento (que pode ter sido modificado ou não)
+                doc_for_ocr = None
+                with st.spinner("Aplicando OCR... Este processo pode ser demorado."):
                     try:
+                        doc_for_ocr = fitz.open(stream=doc_cached.write(), filetype="pdf")
+                        ocr_applied_successfully = apply_ocr_to_doc(doc_for_ocr)
+                        
                         save_options = {"garbage": 4, "deflate": True, "clean": True}
                         if optimize_ocr_output: save_options.update({"deflate_images": True, "deflate_fonts": True})
                         
@@ -322,12 +553,12 @@ if st.session_state.pdf_doc_bytes_original:
                         st.session_state.processed_pdf_bytes_ocr = pdf_output_buffer.getvalue()
                         if ocr_applied_successfully:
                             st.success("PDF com OCR aplicado pronto para download!")
-                        elif ocr_applied_successfully is False and not st.session_state.error_message: # OCR não necessário ou falhou sem exceção grave
+                        elif ocr_applied_successfully is False and not st.session_state.error_message:
                              st.info("PDF salvo. O OCR pode não ter sido aplicado (ex: já era pesquisável ou Tesseract não funcional).")
                     except Exception as e:
                         st.session_state.error_message = f"Erro ao salvar PDF após tentativa de OCR: {e}"; st.error(st.session_state.error_message)
                     finally:
-                        doc_for_ocr.close()
+                        if doc_for_ocr: doc_for_ocr.close()
                 st.session_state.processing_ocr = False
                 st.rerun()
 
