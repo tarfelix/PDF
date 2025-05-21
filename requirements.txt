@@ -1,3 +1,4 @@
 streamlit
 PyMuPDF
 pymupdf-tesseract
+Pillow
