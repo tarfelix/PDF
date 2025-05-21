@@ -5,15 +5,10 @@ import io
 import zipfile
 from PIL import Image # Para manipular imagens para pré-visualização
 
-# Tenta importar pymupdf_tesseract para OCR.
-try:
-    import pymupdf_tesseract # type: ignore # Suprime o aviso de importação não resolvida se não estiver instalado localmente
-    OCR_AVAILABLE = True
-except ImportError:
-    OCR_AVAILABLE = False
-    pymupdf_tesseract = None 
-    print("pymupdf_tesseract não encontrado. Funcionalidade de OCR estará desabilitada.")
-
+# Não vamos mais tentar importar pymupdf_tesseract diretamente aqui.
+# A disponibilidade do OCR será verificada pela presença do método no objeto PyMuPDF
+# e pela configuração do Tesseract no ambiente.
+OCR_POSSIBLY_AVAILABLE = True # Assumimos que pode estar disponível se o Tesseract for instalado via packages.txt
 
 # Configuração da página
 st.set_page_config(layout="wide", page_title="Editor e Divisor de PDF Pro (PT-BR)")
@@ -27,7 +22,7 @@ st.markdown("""
         * A cada N páginas.
     3.  **Extrair Páginas:** Crie um novo PDF contendo apenas as páginas selecionadas.
     4.  **Gerir Páginas Visualmente:** Pré-visualize e selecione páginas para exclusão ou extração.
-    5.  **Tornar Pesquisável (OCR):** Converta PDFs baseados em imagem em PDFs pesquisáveis (requer configuração do Tesseract no ambiente).
+    5.  **Tornar Pesquisável (OCR):** Converta PDFs baseados em imagem em PDFs pesquisáveis (requer Tesseract OCR e pacote de idioma português instalados no ambiente do servidor).
 """)
 
 # --- Funções Auxiliares ---
@@ -84,17 +79,17 @@ def parse_page_input(page_str, max_page_1_idx):
     return sorted(list(selected_pages_0_indexed))
 
 def apply_ocr_if_needed(doc_to_save, ocr_flag):
+    """Aplica OCR ao documento se ocr_flag for True."""
     if not ocr_flag:
         return False 
 
-    if not OCR_AVAILABLE or pymupdf_tesseract is None:
-        st.warning("Funcionalidade de OCR não está disponível (pymupdf-tesseract não importado ou Tesseract não configurado). O PDF será salvo sem OCR.")
+    if not OCR_POSSIBLY_AVAILABLE: # Se soubermos que não está disponível
+        st.warning("Funcionalidade de OCR não está disponível (Tesseract OCR não configurado no servidor). O PDF será salvo sem OCR.")
         return False
 
     try:
-        # Verifica se o documento já é pesquisável para evitar reprocessamento
         is_already_searchable = True
-        if len(doc_to_save) == 0: # Documento vazio
+        if len(doc_to_save) == 0:
              st.info("Documento está vazio, OCR não aplicável.")
              return False
 
@@ -109,22 +104,18 @@ def apply_ocr_if_needed(doc_to_save, ocr_flag):
             return False
 
         st.write("Aplicando OCR (Português)... Este processo pode demorar.")
-        # Tenta usar o método ez_ocr ou um similar fornecido por pymupdf_tesseract
-        if hasattr(doc_to_save, "ez_ocr"): 
-             doc_to_save.ez_ocr(language="por") 
-        elif hasattr(pymupdf_tesseract, "apply_ocr_on_doc"): 
-             pymupdf_tesseract.apply_ocr_on_doc(doc_to_save, language="por")
-        else: # Fallback se os métodos específicos não existirem
-            # PyMuPDF >= 1.19.0 tem ocr_pdf
-            if hasattr(doc_to_save, "ocr_pdf"):
-                 doc_to_save.ocr_pdf(language="por")
-            else:
-                st.warning("Método de OCR direto do PyMuPDF (`ez_ocr` ou `ocr_pdf`) não encontrado. Verifique a instalação e versão do `PyMuPDF` e `pymupdf-tesseract`.")
-                return False
-        st.success("OCR aplicado com sucesso!")
-        return True
+        
+        # Tenta usar o método ocr_pdf do PyMuPDF (disponível em versões mais recentes)
+        if hasattr(doc_to_save, "ocr_pdf"):
+             doc_to_save.ocr_pdf(language="por") # Modifica 'doc_to_save' in-place
+             st.success("OCR aplicado com sucesso!")
+             return True
+        else:
+            st.warning("Método `ocr_pdf` não encontrado no PyMuPDF. A funcionalidade de OCR pode não estar disponível ou requer uma versão mais recente do PyMuPDF. Verifique também se o Tesseract OCR está instalado no servidor.")
+            return False
+
     except Exception as e:
-        st.error(f"Erro durante o processo de OCR: {e}. O PDF será salvo sem OCR adicional.")
+        st.error(f"Erro durante o processo de OCR: {e}. Verifique se o Tesseract OCR e o pacote de idioma 'por' estão instalados no servidor. O PDF será salvo sem OCR adicional.")
         return False
 
 # --- Inicialização do Estado da Sessão ---
@@ -138,22 +129,19 @@ def initialize_session_state():
     }
     for key, value in defaults.items():
         if key not in st.session_state: st.session_state[key] = value
-
 initialize_session_state()
 
 # --- Botão para Limpar Estado ---
-if st.sidebar.button("Limpar PDF Carregado e Seleções", key="clear_all_sidebar_btn"):
+if st.sidebar.button("Limpar PDF Carregado e Seleções", key="clear_all_sidebar_btn_v5"):
     keys_to_reset = [
         'pdf_doc_bytes_original', 'pdf_name', 'bookmarks_data', 
         'processed_pdf_bytes_remove', 'processed_pdf_bytes_extract', 'processed_pdf_bytes_visual',
         'split_pdf_parts', 'error_message', 'last_uploaded_filename', 'page_previews', 
-        'selected_pages_for_visual_management',
-        'processing_remove', 'processing_split', 'processing_extract', 'processing_visual'
+        'selected_pages_for_visual_management'
     ]
     for key in keys_to_reset:
         if key in ['bookmarks_data', 'split_pdf_parts', 'page_previews']: st.session_state[key] = []
         elif key == 'selected_pages_for_visual_management': st.session_state[key] = set()
-        elif key.startswith('processing_'): st.session_state[key] = False
         else: st.session_state[key] = None
             
     dynamic_keys = [k for k in st.session_state if k.startswith("delete_bookmark_") or k.startswith("select_page_preview_") or "_input" in k or "_checkbox" in k]
@@ -163,14 +151,13 @@ if st.sidebar.button("Limpar PDF Carregado e Seleções", key="clear_all_sidebar
     st.rerun()
 
 # --- Upload do Arquivo ---
-uploaded_file = st.file_uploader("Carregue seu arquivo PDF", type="pdf", key="pdf_uploader_main_v5")
+uploaded_file = st.file_uploader("Carregue seu arquivo PDF", type="pdf", key="pdf_uploader_main_v5_2")
 
 if uploaded_file is not None:
     if st.session_state.last_uploaded_filename != uploaded_file.name:
         st.session_state.pdf_doc_bytes_original = uploaded_file.getvalue()
         st.session_state.pdf_name = uploaded_file.name
         st.session_state.last_uploaded_filename = uploaded_file.name
-        
         st.session_state.bookmarks_data = []
         st.session_state.processed_pdf_bytes_remove = None
         st.session_state.processed_pdf_bytes_extract = None
@@ -232,9 +219,7 @@ if st.session_state.pdf_doc_bytes_original:
         
         optimize_pdf_remove = st.checkbox("Otimizar PDF ao salvar", value=True, key="optimize_pdf_remove_checkbox_tab_remove")
         ocr_pdf_remove = st.checkbox("Tornar PDF pesquisável (OCR - Português)", value=False, key="ocr_pdf_remove_checkbox_tab_remove", help="Requer Tesseract OCR e pacote de idioma português configurados no ambiente do servidor. Pode demorar e aumentar o tamanho do arquivo se já for pesquisável.")
-        if ocr_pdf_remove and not OCR_AVAILABLE:
-            st.warning("A biblioteca `pymupdf-tesseract` não foi encontrada ou o Tesseract não está configurado. A funcionalidade de OCR não estará disponível.")
-
+        
         if st.button("Processar Remoção de Páginas", key="process_remove_button_tab_remove", disabled=st.session_state.get('processing_remove', False)):
             st.session_state.processing_remove = True
             st.session_state.processed_pdf_bytes_remove = None; st.session_state.error_message = None
@@ -255,7 +240,7 @@ if st.session_state.pdf_doc_bytes_original:
                 else:
                     try:
                         doc_to_modify.delete_pages(all_pages_to_delete_0_indexed)
-                        if ocr_pdf_remove: apply_ocr_if_needed(doc_to_modify, True) # Passa o doc e a flag
+                        if ocr_pdf_remove: apply_ocr_if_needed(doc_to_modify, True)
                         
                         save_options = {"garbage": 4, "deflate": True, "clean": True}
                         if optimize_pdf_remove: save_options.update({"deflate_images": True, "deflate_fonts": True})
@@ -266,7 +251,7 @@ if st.session_state.pdf_doc_bytes_original:
                     except Exception as e: st.session_state.error_message = f"Erro ao remover páginas: {e}"; st.error(st.session_state.error_message)
                     finally: doc_to_modify.close()
             st.session_state.processing_remove = False
-            st.rerun() # Para atualizar o estado do botão de download
+            st.rerun() 
 
         if st.session_state.processed_pdf_bytes_remove:
             download_filename_remove = f"{os.path.splitext(st.session_state.pdf_name)[0]}_editado.pdf"
@@ -278,8 +263,7 @@ if st.session_state.pdf_doc_bytes_original:
         split_method = st.radio("Método de Divisão:", ("Por Tamanho Máximo (MB)", "A Cada N Páginas"), key="split_method_radio_tab_split")
         optimize_pdf_split = st.checkbox("Otimizar partes divididas", value=True, key="optimize_pdf_split_checkbox_tab_split")
         ocr_pdf_split = st.checkbox("Tornar partes pesquisáveis (OCR - Português)", value=False, key="ocr_pdf_split_checkbox_tab_split", help="Requer Tesseract. Pode demorar e aumentar o tamanho.")
-        if ocr_pdf_split and not OCR_AVAILABLE: st.warning("OCR desabilitado: `pymupdf-tesseract` não encontrado ou Tesseract não configurado.")
-
+        
         if split_method == "Por Tamanho Máximo (MB)":
             max_size_mb = st.number_input("Tamanho máximo por parte (MB):", min_value=0.1, value=5.0, step=0.1, format="%.1f", key="max_size_mb_input_tab_split")
             if st.button("Dividir por Tamanho", key="split_by_size_button_tab_split", disabled=st.session_state.get('processing_split', False)):
@@ -371,8 +355,7 @@ if st.session_state.pdf_doc_bytes_original:
         extract_pages_str = st.text_input("Páginas a extrair (ex: 1, 3-5, 8):", key="extract_pages_input_tab_extract")
         optimize_pdf_extract = st.checkbox("Otimizar PDF extraído", value=True, key="optimize_pdf_extract_checkbox_tab_extract")
         ocr_pdf_extract = st.checkbox("Tornar PDF pesquisável (OCR - Português)", value=False, key="ocr_pdf_extract_checkbox_tab_extract", help="Requer Tesseract. Pode demorar.")
-        if ocr_pdf_extract and not OCR_AVAILABLE: st.warning("OCR desabilitado: `pymupdf-tesseract` não encontrado ou Tesseract não configurado.")
-
+        
         if st.button("Processar Extração de Páginas", key="process_extract_button_tab_extract", disabled=st.session_state.get('processing_extract', False)):
             st.session_state.processing_extract = True
             st.session_state.processed_pdf_bytes_extract = None; st.session_state.error_message = None
@@ -383,7 +366,7 @@ if st.session_state.pdf_doc_bytes_original:
                 else:
                     try:
                         new_extracted_doc = fitz.open()
-                        new_extracted_doc.insert_pdf(doc_temp_extract, from_page=0, to_page=doc_temp_extract.page_count-1, toc=False, annots=True, links=True, selected_pages=pages_to_extract_0_indexed) # selected_pages é o novo nome
+                        new_extracted_doc.insert_pdf(doc_temp_extract, from_page=0, to_page=doc_temp_extract.page_count-1, toc=False, annots=True, links=True, selected_pages=pages_to_extract_0_indexed)
                         
                         if ocr_pdf_extract: apply_ocr_if_needed(new_extracted_doc, True)
                         save_options = {"garbage": 4, "deflate": True, "clean": True}
@@ -409,13 +392,14 @@ if st.session_state.pdf_doc_bytes_original:
             st.info("Carregue um PDF para ver as pré-visualizações das páginas aqui.")
         else:
             st.markdown(f"Total de páginas: {len(st.session_state.page_previews)}. Selecione as páginas abaixo:")
-            cols = st.columns(st.sidebar.slider("Colunas para pré-visualização:", 2, 6, 4, key="preview_cols_slider"))
+            num_cols_preview = st.sidebar.slider("Colunas para pré-visualização:", 2, 8, 4, key="preview_cols_slider_v5")
+            cols = st.columns(num_cols_preview) 
             
             for i, img_bytes in enumerate(st.session_state.page_previews):
-                with cols[i % len(cols)]:
+                with cols[i % num_cols_preview]:
                     page_key = f"select_page_preview_{i}"
                     if page_key not in st.session_state: st.session_state[page_key] = False
-                    st.image(img_bytes, caption=f"Página {i+1}", width=150)
+                    st.image(img_bytes, caption=f"Página {i+1}", width=120) # Reduzi um pouco para caber mais colunas
                     is_selected = st.checkbox("Selecionar", key=page_key, value=st.session_state[page_key])
                     if is_selected: st.session_state.selected_pages_for_visual_management.add(i)
                     elif i in st.session_state.selected_pages_for_visual_management:
@@ -425,7 +409,7 @@ if st.session_state.pdf_doc_bytes_original:
 
             col_action1, col_action2 = st.columns(2)
             with col_action1:
-                if st.button("Excluir Páginas Selecionadas", key="delete_visual_button", disabled=st.session_state.get('processing_visual', False)):
+                if st.button("Excluir Páginas Selecionadas", key="delete_visual_button_tab_visual", disabled=st.session_state.get('processing_visual', False)):
                     st.session_state.processing_visual = True
                     st.session_state.processed_pdf_bytes_visual = None; st.session_state.error_message = None
                     if not st.session_state.selected_pages_for_visual_management: st.warning("Nenhuma página selecionada para exclusão.")
@@ -442,7 +426,7 @@ if st.session_state.pdf_doc_bytes_original:
                                     doc_to_modify.save(pdf_output_buffer, **save_options)
                                     st.session_state.processed_pdf_bytes_visual = pdf_output_buffer.getvalue()
                                     st.success(f"{len(pages_to_delete)} página(s) excluída(s)!")
-                                    st.session_state.selected_pages_for_visual_management = set() # Limpa seleção
+                                    st.session_state.selected_pages_for_visual_management = set() 
                                     for i_reset in range(len(st.session_state.page_previews)): st.session_state[f"select_page_preview_{i_reset}"] = False
                             except Exception as e: st.error(f"Erro ao excluir páginas: {e}")
                             finally: 
@@ -451,7 +435,7 @@ if st.session_state.pdf_doc_bytes_original:
                     st.rerun()
 
             with col_action2:
-                if st.button("Extrair Páginas Selecionadas", key="extract_visual_button", disabled=st.session_state.get('processing_visual', False)):
+                if st.button("Extrair Páginas Selecionadas", key="extract_visual_button_tab_visual", disabled=st.session_state.get('processing_visual', False)):
                     st.session_state.processing_visual = True
                     st.session_state.processed_pdf_bytes_visual = None; st.session_state.error_message = None
                     if not st.session_state.selected_pages_for_visual_management: st.warning("Nenhuma página selecionada para extração.")
@@ -467,7 +451,7 @@ if st.session_state.pdf_doc_bytes_original:
                                 new_doc.save(pdf_output_buffer, **save_options)
                                 st.session_state.processed_pdf_bytes_visual = pdf_output_buffer.getvalue()
                                 st.success(f"{len(pages_to_extract)} página(s) extraída(s)!")
-                                st.session_state.selected_pages_for_visual_management = set() # Limpa seleção
+                                st.session_state.selected_pages_for_visual_management = set()
                                 for i_reset in range(len(st.session_state.page_previews)): st.session_state[f"select_page_preview_{i_reset}"] = False
                             except Exception as e: st.error(f"Erro ao extrair páginas: {e}")
                             finally:
@@ -477,7 +461,7 @@ if st.session_state.pdf_doc_bytes_original:
                     st.rerun()
             
             if st.session_state.processed_pdf_bytes_visual:
-                action_type_visual = "excluido_vis" if 'delete_visual_button' in st.session_state and st.session_state.delete_visual_button else "extraido_vis"
+                action_type_visual = "excluido_visualmente" if 'delete_visual_button_tab_visual' in st.session_state and st.session_state.delete_visual_button_tab_visual else "extraido_visualmente"
                 download_filename_visual = f"{os.path.splitext(st.session_state.pdf_name)[0]}_{action_type_visual}.pdf"
                 st.download_button(
                     label=f"Baixar PDF ({action_type_visual.replace('_', ' ')})", 
@@ -497,6 +481,6 @@ st.sidebar.info(
     "Inclui opção experimental de OCR (requer configuração do Tesseract no servidor). "
     "Desenvolvido com Streamlit e PyMuPDF."
 )
-if not OCR_AVAILABLE:
-    st.sidebar.warning("A funcionalidade de OCR (tornar pesquisável) está limitada ou desabilitada pois `pymupdf-tesseract` não foi encontrado ou o Tesseract não está configurado no ambiente do servidor. Para ativá-la no Streamlit Cloud, adicione `tesseract-ocr` e `tesseract-ocr-por` ao seu `packages.txt` e `pymupdf-tesseract` ao `requirements.txt`.")
+if not OCR_POSSIBLY_AVAILABLE: # Usar a nova flag
+    st.sidebar.warning("A funcionalidade de OCR (tornar pesquisável) pode estar limitada ou desabilitada. Verifique se o Tesseract OCR e o pacote de idioma português (`tesseract-ocr-por`) estão listados no seu `packages.txt` para o Streamlit Cloud.")
 
