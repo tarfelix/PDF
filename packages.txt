@@ -1,2 +1,3 @@
 tesseract-ocr
 tesseract-ocr-por
+# libgl1-mesa-glx (descomente se houver erros relacionados a Qt/libGL no log de build)
