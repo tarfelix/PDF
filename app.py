@@ -4,34 +4,35 @@ import os
 import io
 import zipfile
 from PIL import Image
+# shutil não é mais necessário
 
-st.set_page_config(layout="wide", page_title="Editor e Divisor de PDF Completo (PT-BR)")
+st.set_page_config(layout="wide", page_title="Editor de PDF Super Completo (PT-BR)")
 
-st.title("✂️ Editor e Divisor de PDF Completo")
+st.title("✂️ Editor e Divisor de PDF Super Completo")
 st.markdown("""
     **Funcionalidades:**
-    1.  **Remover Páginas:** Exclua seções com base em marcadores (bookmarks) ou números de página.
-    2.  **Dividir PDF:** Por tamanho máximo de arquivo (MB) ou a cada N páginas.
-    3.  **Extrair Páginas:** Crie um novo PDF com páginas selecionadas.
-    4.  **Gerir Páginas Visualmente:** Pré-visualize e selecione páginas para exclusão ou extração.
-    5.  **Mesclar PDFs:** Combine múltiplos ficheiros PDF num único documento, com opção de reordená-los.
+    1.  **Mesclar PDFs:** Combine múltiplos ficheiros PDF num único documento, com opção de reordená-los.
+    2.  **Remover Páginas:** Exclua seções com base em marcadores (bookmarks) ou números de página.
+    3.  **Dividir PDF:** Por tamanho máximo de arquivo (MB) ou a cada N páginas.
+    4.  **Extrair Páginas:** Crie um novo PDF com páginas selecionadas (via marcadores ou números diretos).
+    5.  **Gerir Páginas Visualmente:** Pré-visualize e selecione páginas para exclusão ou extração.
+    6.  **Otimizar PDF:** Reduza o tamanho do ficheiro com várias opções de otimização.
 """)
 
 # --- Dicionário Padrão para o Estado da Sessão ---
 DEFAULT_STATE = {
-    'pdf_doc_bytes_original': None, 'pdf_name': None, 'bookmarks_data': [], # Para PDF principal (edição)
+    'pdf_doc_bytes_original': None, 'pdf_name': None, 'bookmarks_data': [],
     'processed_pdf_bytes_remove': None, 'processed_pdf_bytes_extract': None, 
     'processed_pdf_bytes_visual': None, 'processed_pdf_bytes_merge': None, 
-    'split_pdf_parts': [], 'error_message': None, 
-    'last_uploaded_file_ids': [], # Lista de IDs dos ficheiros carregados
+    'processed_pdf_bytes_optimize': None, # Nova chave para PDF otimizado
+    'split_pdf_parts': [], 'error_message': None, 'last_uploaded_filename': None,
     'page_previews': [], 'visual_page_selection': {}, 
     'files_to_merge': [], 
     'processing_remove': False, 'processing_split': False, 'processing_extract': False, 
     'processing_visual_delete': False, 'processing_visual_extract': False, 
-    'processing_merge': False, 
+    'processing_merge': False, 'processing_optimize': False, # Nova chave de processamento
     'active_tab_for_preview': None, 'generating_previews': False,
-    'current_page_count_for_inputs': 0,
-    'is_single_pdf_mode': False # True se um único PDF for carregado para edição
+    'current_page_count_for_inputs': 0
 }
 
 # --- Cache para Carregamento do PDF ---
@@ -108,10 +109,13 @@ initialize_session_state()
 
 # --- Botão para Limpar Estado ---
 if st.sidebar.button("Limpar Tudo e Recomeçar", key="clear_all_sidebar_btn_v10"):
-    for key in DEFAULT_STATE.keys(): # Reseta para os valores padrão
-        st.session_state[key] = type(DEFAULT_STATE[key])() if isinstance(DEFAULT_STATE[key], (list, dict, set)) else DEFAULT_STATE[key]
+    for key in DEFAULT_STATE.keys():
+        if key in ['bookmarks_data', 'split_pdf_parts', 'page_previews', 'files_to_merge']: st.session_state[key] = []
+        elif key == 'visual_page_selection': st.session_state[key] = {}
+        elif key.startswith('processing_'): st.session_state[key] = False
+        else: st.session_state[key] = None
             
-    dynamic_keys = [k for k in st.session_state if k.startswith("delete_bookmark_") or "_input" in k or "_checkbox" in k or k.startswith("up_") or k.startswith("down_")]
+    dynamic_keys = [k for k in st.session_state if k.startswith("delete_bookmark_") or k.startswith("extract_bookmark_") or "_input" in k or "_checkbox" in k or k.startswith("up_") or k.startswith("down_")]
     for k_del in dynamic_keys:
         if k_del in st.session_state: del st.session_state[k_del]
     
@@ -128,30 +132,20 @@ uploaded_files = st.file_uploader(
     key="main_pdf_uploader_v10"
 )
 
-# Lógica para lidar com os ficheiros carregados
 if uploaded_files:
     current_uploaded_file_ids = sorted([f.file_id for f in uploaded_files])
     if st.session_state.last_uploaded_file_ids != current_uploaded_file_ids:
         st.session_state.last_uploaded_file_ids = current_uploaded_file_ids
-        load_pdf_from_bytes.clear() # Limpa cache se os ficheiros mudarem
-
-        # Resetar estados de processamento e resultados anteriores
-        st.session_state.processed_pdf_bytes_remove = None
-        st.session_state.processed_pdf_bytes_extract = None
-        st.session_state.processed_pdf_bytes_visual = None
-        st.session_state.processed_pdf_bytes_merge = None
-        st.session_state.split_pdf_parts = []
-        st.session_state.page_previews = []
-        st.session_state.visual_page_selection = {}
-        st.session_state.bookmarks_data = []
-        st.session_state.error_message = None
+        load_pdf_from_bytes.clear() 
+        for key in DEFAULT_STATE.keys(): # Reset completo ao carregar novos ficheiros
+            if key not in ['last_uploaded_file_ids']: # Mantém o ID dos ficheiros atuais
+                st.session_state[key] = type(DEFAULT_STATE[key])() if isinstance(DEFAULT_STATE[key], (list, dict, set)) else DEFAULT_STATE[key]
 
         if len(uploaded_files) == 1:
             st.session_state.is_single_pdf_mode = True
             st.session_state.pdf_doc_bytes_original = uploaded_files[0].getvalue()
             st.session_state.pdf_name = uploaded_files[0].name
-            st.session_state.files_to_merge = [] # Limpa ficheiros para mesclagem
-
+            st.session_state.files_to_merge = [] 
             doc_data = load_pdf_from_bytes(st.session_state.pdf_doc_bytes_original, st.session_state.pdf_name)
             if doc_data and doc_data[0]:
                 _, bookmarks, page_count = doc_data
@@ -159,55 +153,42 @@ if uploaded_files:
                 st.session_state.bookmarks_data = bookmarks
                 st.session_state.current_page_count_for_inputs = page_count
             else:
-                st.session_state.is_single_pdf_mode = False
-                st.session_state.pdf_doc_bytes_original = None
+                st.session_state.is_single_pdf_mode = False; st.session_state.pdf_doc_bytes_original = None
                 st.error("Falha ao carregar o PDF para edição.")
-        
         elif len(uploaded_files) > 1:
             st.session_state.is_single_pdf_mode = False
-            st.session_state.files_to_merge = uploaded_files # Define para mesclagem
-            st.session_state.pdf_doc_bytes_original = None # Limpa PDF principal de edição
-            st.session_state.pdf_name = None
+            st.session_state.files_to_merge = uploaded_files 
+            st.session_state.pdf_doc_bytes_original = None; st.session_state.pdf_name = None
             st.session_state.bookmarks_data = []
             st.success(f"{len(uploaded_files)} PDFs carregados para mesclagem.")
-        
-        else: # Nenhum ficheiro (lista vazia), mas o uploader foi acionado
+        else: 
             st.session_state.is_single_pdf_mode = False
-            st.session_state.pdf_doc_bytes_original = None
-            st.session_state.files_to_merge = []
+            st.session_state.pdf_doc_bytes_original = None; st.session_state.files_to_merge = []
     
 elif not uploaded_files and st.session_state.last_uploaded_file_ids: 
-    # Se os ficheiros foram removidos do uploader
     st.session_state.is_single_pdf_mode = False
-    st.session_state.pdf_doc_bytes_original = None
-    st.session_state.files_to_merge = []
+    st.session_state.pdf_doc_bytes_original = None; st.session_state.files_to_merge = []
     st.session_state.last_uploaded_file_ids = []
     load_pdf_from_bytes.clear()
     st.info("Nenhum PDF carregado.")
 
-
 # --- Definição e Exibição das Abas ---
 st.header("2. Escolha uma Ação")
-
-# Aba de Mesclagem sempre visível
 tab_titles_all = ["Mesclar PDFs"] 
-# Abas de edição só se um único PDF estiver carregado
 if st.session_state.is_single_pdf_mode and st.session_state.pdf_doc_bytes_original:
-    tab_titles_all.extend(["Remover Páginas", "Dividir PDF", "Extrair Páginas", "Gerir Páginas Visualmente"])
-
+    tab_titles_all.extend(["Remover Páginas", "Dividir PDF", "Extrair Páginas", "Gerir Páginas Visualmente", "Otimizar PDF"])
 tabs = st.tabs(tab_titles_all)
 
 # --- ABA: MESCLAR PDFS ---
 with tabs[0]: 
+    # ... (Código da aba Mesclar, como na v10 - sem alterações significativas aqui)
     st.subheader("Mesclar Múltiplos Ficheiros PDF")
     if not st.session_state.files_to_merge and not st.session_state.is_single_pdf_mode:
         st.info("Carregue dois ou mais ficheiros PDF no topo da página para ativar a mesclagem.")
     elif st.session_state.is_single_pdf_mode:
         st.info("Apenas um PDF foi carregado. Para mesclar, carregue múltiplos ficheiros no topo da página.")
-    
-    if st.session_state.files_to_merge: # Só mostra se há ficheiros para mesclar
+    if st.session_state.files_to_merge:
         st.markdown("**Ficheiros carregados para mesclagem (reordene se necessário):**")
-        
         def move_file_up(index_to_move):
             if index_to_move > 0:
                 current_list = list(st.session_state.files_to_merge)
@@ -220,37 +201,31 @@ with tabs[0]:
                 current_list.insert(index_to_move + 1, current_list.pop(index_to_move))
                 st.session_state.files_to_merge = current_list
                 st.session_state.processed_pdf_bytes_merge = None
-
         for i, f_obj in enumerate(st.session_state.files_to_merge):
             cols = st.columns([0.1, 0.1, 0.8]) 
             with cols[0]:
                 if i > 0:
-                    st.button("⬆️", key=f"up_{f_obj.file_id}_{i}_v10", on_click=move_file_up, args=(i,), help="Mover para cima")
+                    st.button("⬆️", key=f"up_{f_obj.file_id}_{i}_v10_merge", on_click=move_file_up, args=(i,), help="Mover para cima")
             with cols[1]:
                 if i < len(st.session_state.files_to_merge) - 1:
-                    st.button("⬇️", key=f"down_{f_obj.file_id}_{i}_v10", on_click=move_file_down, args=(i,), help="Mover para baixo")
+                    st.button("⬇️", key=f"down_{f_obj.file_id}_{i}_v10_merge", on_click=move_file_down, args=(i,), help="Mover para baixo")
             with cols[2]:
                 st.write(f"{f_obj.name} ({round(f_obj.size / (1024*1024), 2)} MB)")
-        
         st.markdown("---")
-        optimize_merged_pdf = st.checkbox("Otimizar PDF mesclado ao salvar", value=True, key="optimize_merged_pdf_v10")
-
-        if st.button("Mesclar PDFs na Ordem Acima", key="process_merge_button_v10", disabled=st.session_state.get('processing_merge', False) or len(st.session_state.files_to_merge) < 1):
+        optimize_merged_pdf = st.checkbox("Otimizar PDF mesclado ao salvar", value=True, key="optimize_merged_pdf_v10_merge")
+        if st.button("Mesclar PDFs na Ordem Acima", key="process_merge_button_v10_merge", disabled=st.session_state.get('processing_merge', False) or len(st.session_state.files_to_merge) < 1):
             if not st.session_state.files_to_merge:
                 st.warning("Por favor, carregue pelo menos um ficheiro PDF para processar.")
             elif len(st.session_state.files_to_merge) == 1:
                  st.info("Apenas um ficheiro carregado. A 'mesclagem' resultará numa cópia deste ficheiro.")
-            
             st.session_state.processing_merge = True
-            st.session_state.processed_pdf_bytes_merge = None
-            st.session_state.error_message = None
+            st.session_state.processed_pdf_bytes_merge = None; st.session_state.error_message = None
             merged_doc = None
             with st.spinner(f"A mesclar {len(st.session_state.files_to_merge)} ficheiro(s) PDF... Por favor, aguarde."):
                 try:
                     merged_doc = fitz.open() 
                     merge_progress_bar = st.progress(0, text="Iniciando mesclagem...")
                     total_files_to_merge = len(st.session_state.files_to_merge)
-
                     for i, file_to_insert in enumerate(st.session_state.files_to_merge):
                         progress_text = f"Adicionando ficheiro {i+1}/{total_files_to_merge}: {file_to_insert.name}"
                         merge_progress_bar.progress(int(((i + 1) / total_files_to_merge) * 100), text=progress_text)
@@ -264,7 +239,6 @@ with tabs[0]:
                             break 
                         finally:
                             if doc_to_insert: doc_to_insert.close()
-                    
                     if not st.session_state.error_message:
                         merge_progress_bar.empty()
                         save_options = {"garbage": 4, "deflate": True, "clean": True}
@@ -277,14 +251,12 @@ with tabs[0]:
                     else:
                          if 'merge_progress_bar' in locals(): merge_progress_bar.empty()
                 except Exception as e:
-                    st.session_state.error_message = f"Erro durante a mesclagem dos PDFs: {e}"
-                    st.error(st.session_state.error_message)
+                    st.session_state.error_message = f"Erro durante a mesclagem dos PDFs: {e}"; st.error(st.session_state.error_message)
                     if 'merge_progress_bar' in locals() and hasattr(merge_progress_bar, 'empty'): merge_progress_bar.empty()
                 finally:
                     if merged_doc: merged_doc.close()
             st.session_state.processing_merge = False
             st.rerun()
-        
         if st.session_state.processed_pdf_bytes_merge:
             download_filename_merge = "documento_mesclado.pdf"
             if st.session_state.files_to_merge:
@@ -292,8 +264,8 @@ with tabs[0]:
                 if len(st.session_state.files_to_merge) > 1:
                     download_filename_merge = f"{first_file_name}_e_outros_mesclado.pdf"
                 else:
-                    download_filename_merge = f"{first_file_name}_copia.pdf" # Se for só um ficheiro
-            st.download_button(label="Baixar PDF Mesclado", data=st.session_state.processed_pdf_bytes_merge, file_name=download_filename_merge, mime="application/pdf", key="download_merge_button_v10")
+                    download_filename_merge = f"{first_file_name}_copia.pdf"
+            st.download_button(label="Baixar PDF Mesclado", data=st.session_state.processed_pdf_bytes_merge, file_name=download_filename_merge, mime="application/pdf", key="download_merge_button_v10_merge")
 
 # Abas de edição (só se is_single_pdf_mode for True)
 if st.session_state.is_single_pdf_mode and st.session_state.pdf_doc_bytes_original:
@@ -302,25 +274,25 @@ if st.session_state.is_single_pdf_mode and st.session_state.pdf_doc_bytes_origin
         st.error("Não foi possível carregar o documento PDF principal para edição.")
     else:
         doc_cached, _, _ = doc_cached_data 
-        tab_index_offset = 1 # As abas de edição começam no índice 1
+        tab_index_offset = 1 
 
         with tabs[tab_index_offset]: 
-            # ... (Lógica da aba Remover Páginas, como na v9_fix)
+            # ... (Lógica da aba Remover Páginas, como na v10)
             st.header("Remover Páginas do PDF")
             with st.expander("Excluir por Marcadores", expanded=True):
                 if st.session_state.bookmarks_data:
                     st.markdown("Selecione os marcadores cujos intervalos de páginas você deseja excluir.")
                     with st.container(height=300):
                         for bm in st.session_state.bookmarks_data:
-                            checkbox_key = f"delete_bookmark_{bm['id']}_tab_remove_v10"
+                            checkbox_key = f"delete_bookmark_{bm['id']}_tab_remove_v10_final"
                             if checkbox_key not in st.session_state: st.session_state[checkbox_key] = False
                             st.checkbox(label=bm['display_text'], value=st.session_state[checkbox_key], key=checkbox_key)
                 else:
                     st.info("Nenhum marcador encontrado neste PDF para seleção.")
             with st.expander("Excluir por Números de Página", expanded=True):
-                direct_pages_str_tab_remove = st.text_input("Páginas a excluir (ex: 1, 3-5, 8):", key="direct_pages_input_tab_remove_v10")
-            optimize_pdf_remove = st.checkbox("Otimizar PDF ao salvar", value=True, key="optimize_pdf_remove_checkbox_tab_remove_v10")
-            if st.button("Processar Remoção de Páginas", key="process_remove_button_tab_remove_v10", disabled=st.session_state.get('processing_remove', False)):
+                direct_pages_str_tab_remove = st.text_input("Páginas a excluir (ex: 1, 3-5, 8):", key="direct_pages_input_tab_remove_v10_final")
+            optimize_pdf_remove = st.checkbox("Otimizar PDF ao salvar", value=True, key="optimize_pdf_remove_checkbox_tab_remove_v10_final")
+            if st.button("Processar Remoção de Páginas", key="process_remove_button_tab_remove_v10_final", disabled=st.session_state.get('processing_remove', False)):
                 st.session_state.processing_remove = True
                 st.session_state.processed_pdf_bytes_remove = None; st.session_state.error_message = None
                 with st.spinner("A processar remoção de páginas... Por favor, aguarde."):
@@ -330,7 +302,7 @@ if st.session_state.is_single_pdf_mode and st.session_state.pdf_doc_bytes_origin
                         selected_bookmark_pages_to_delete = set()
                         if st.session_state.bookmarks_data:
                             for bm in st.session_state.bookmarks_data:
-                                if st.session_state.get(f"delete_bookmark_{bm['id']}_tab_remove_v10", False):
+                                if st.session_state.get(f"delete_bookmark_{bm['id']}_tab_remove_v10_final", False):
                                     for page_num in range(bm["start_page_0_idx"], bm["end_page_0_idx"] + 1):
                                         selected_bookmark_pages_to_delete.add(page_num)
                         direct_pages_to_delete_list = parse_page_input(direct_pages_str_tab_remove, doc_to_modify.page_count)
@@ -353,16 +325,16 @@ if st.session_state.is_single_pdf_mode and st.session_state.pdf_doc_bytes_origin
                 st.rerun()
             if st.session_state.processed_pdf_bytes_remove:
                 download_filename_remove = f"{os.path.splitext(st.session_state.pdf_name)[0]}_editado.pdf"
-                st.download_button(label="Baixar PDF Editado", data=st.session_state.processed_pdf_bytes_remove, file_name=download_filename_remove, mime="application/pdf", key="download_remove_button_tab_remove_v10")
+                st.download_button(label="Baixar PDF Editado", data=st.session_state.processed_pdf_bytes_remove, file_name=download_filename_remove, mime="application/pdf", key="download_remove_button_tab_remove_v10_final")
 
         with tabs[tab_index_offset + 1]:
-            # ... (código da aba dividir, mantido como na v9_fix)
+            # ... (Lógica da aba Dividir, como na v10)
             st.header("Dividir PDF")
-            split_method = st.radio("Método de Divisão:", ("Por Tamanho Máximo (MB)", "A Cada N Páginas"), key="split_method_radio_tab_split_v10")
-            optimize_pdf_split = st.checkbox("Otimizar partes divididas", value=True, key="optimize_pdf_split_checkbox_tab_split_v10")
+            split_method = st.radio("Método de Divisão:", ("Por Tamanho Máximo (MB)", "A Cada N Páginas"), key="split_method_radio_tab_split_v10_final")
+            optimize_pdf_split = st.checkbox("Otimizar partes divididas", value=True, key="optimize_pdf_split_checkbox_tab_split_v10_final")
             if split_method == "Por Tamanho Máximo (MB)":
-                max_size_mb = st.number_input("Tamanho máximo por parte (MB):", min_value=0.1, value=5.0, step=0.1, format="%.1f", key="max_size_mb_input_tab_split_v10")
-                if st.button("Dividir por Tamanho", key="split_by_size_button_tab_split_v10", disabled=st.session_state.get('processing_split', False)):
+                max_size_mb = st.number_input("Tamanho máximo por parte (MB):", min_value=0.1, value=5.0, step=0.1, format="%.1f", key="max_size_mb_input_tab_split_v10_final")
+                if st.button("Dividir por Tamanho", key="split_by_size_button_tab_split_v10_final", disabled=st.session_state.get('processing_split', False)):
                     st.session_state.processing_split = True
                     st.session_state.split_pdf_parts = [] ; st.session_state.error_message = None
                     progress_bar_split_size = st.progress(0, text="Iniciando divisão por tamanho...")
@@ -409,8 +381,8 @@ if st.session_state.is_single_pdf_mode and st.session_state.pdf_doc_bytes_origin
                     st.session_state.processing_split = False
                     st.rerun()
             elif split_method == "A Cada N Páginas":
-                pages_per_split = st.number_input("Número de páginas por parte:", min_value=1, value=10, step=1, key="pages_per_split_input_tab_split_v10")
-                if st.button("Dividir por Número de Páginas", key="split_by_count_button_tab_split_v10", disabled=st.session_state.get('processing_split', False)):
+                pages_per_split = st.number_input("Número de páginas por parte:", min_value=1, value=10, step=1, key="pages_per_split_input_tab_split_v10_final")
+                if st.button("Dividir por Número de Páginas", key="split_by_count_button_tab_split_v10_final", disabled=st.session_state.get('processing_split', False)):
                     st.session_state.processing_split = True
                     st.session_state.split_pdf_parts = []; st.session_state.error_message = None
                     progress_bar_split_count = st.progress(0, text="Iniciando divisão por contagem...")
@@ -451,46 +423,78 @@ if st.session_state.is_single_pdf_mode and st.session_state.pdf_doc_bytes_origin
                             for part in st.session_state.split_pdf_parts:
                                 zip_file.writestr(part["name"], part["data"])
                         zip_buffer.seek(0)
-                    st.download_button(label=f"Baixar Todas as Partes ({len(st.session_state.split_pdf_parts)}) como ZIP", data=zip_buffer, file_name=f"{os.path.splitext(st.session_state.pdf_name)[0]}_partes.zip", mime="application/zip", key="download_zip_button_tab_split_v10")
+                    st.download_button(label=f"Baixar Todas as Partes ({len(st.session_state.split_pdf_parts)}) como ZIP", data=zip_buffer, file_name=f"{os.path.splitext(st.session_state.pdf_name)[0]}_partes.zip", mime="application/zip", key="download_zip_button_tab_split_v10_final")
                     st.markdown("---")
                 for i, part in enumerate(st.session_state.split_pdf_parts):
-                    st.download_button(label=f"Baixar {part['name']}", data=part["data"], file_name=part["name"], mime="application/pdf", key=f"download_part_{i}_button_tab_split_v10")
+                    st.download_button(label=f"Baixar {part['name']}", data=part["data"], file_name=part["name"], mime="application/pdf", key=f"download_part_{i}_button_tab_split_v10_final")
 
+        # --- ABA: EXTRAIR PÁGINAS ---
         with tabs[tab_index_offset + 2]:
-            # ... (código da aba extrair, mantido como na v9_fix)
             st.header("Extrair Páginas Específicas")
-            extract_pages_str = st.text_input("Páginas a extrair (ex: 1, 3-5, 8):", key="extract_pages_input_tab_extract_v10")
-            optimize_pdf_extract = st.checkbox("Otimizar PDF extraído", value=True, key="optimize_pdf_extract_checkbox_tab_extract_v10")
-            if st.button("Processar Extração de Páginas", key="process_extract_button_tab_extract_v10", disabled=st.session_state.get('processing_extract', False)):
+            with st.expander("Extrair por Marcadores", expanded=False): # Default para não expandido
+                if st.session_state.bookmarks_data:
+                    st.markdown("Selecione os marcadores cujos intervalos de páginas você deseja extrair.")
+                    with st.container(height=200): # Menor altura para esta lista
+                        for bm in st.session_state.bookmarks_data:
+                            checkbox_key = f"extract_bookmark_{bm['id']}_tab_extract_v10" # Chave diferente para extração
+                            if checkbox_key not in st.session_state: st.session_state[checkbox_key] = False
+                            st.checkbox(label=bm['display_text'], value=st.session_state[checkbox_key], key=checkbox_key)
+                else:
+                    st.info("Nenhum marcador encontrado neste PDF para seleção.")
+
+            with st.expander("Extrair por Números de Página", expanded=True):
+                extract_pages_str = st.text_input("Páginas a extrair (ex: 1, 3-5, 8):", key="extract_pages_input_tab_extract_v10_final")
+            
+            optimize_pdf_extract = st.checkbox("Otimizar PDF extraído", value=True, key="optimize_pdf_extract_checkbox_tab_extract_v10_final")
+            
+            if st.button("Processar Extração de Páginas", key="process_extract_button_tab_extract_v10_final", disabled=st.session_state.get('processing_extract', False)):
                 st.session_state.processing_extract = True
                 st.session_state.processed_pdf_bytes_extract = None; st.session_state.error_message = None
                 doc_original_for_extract = None; new_extracted_doc = None
                 with st.spinner("A extrair páginas... Por favor, aguarde."):
                     try:
                         doc_original_for_extract = fitz.open(stream=doc_cached.write(), filetype="pdf") 
-                        pages_to_extract_0_indexed = parse_page_input(extract_pages_str, doc_original_for_extract.page_count)
-                        if not pages_to_extract_0_indexed: st.warning("Nenhuma página especificada para extração.")
+                        
+                        # Coletar páginas dos marcadores selecionados para extração
+                        selected_bookmark_pages_to_extract = set()
+                        if st.session_state.bookmarks_data:
+                            for bm in st.session_state.bookmarks_data:
+                                if st.session_state.get(f"extract_bookmark_{bm['id']}_tab_extract_v10", False):
+                                    for page_num in range(bm["start_page_0_idx"], bm["end_page_0_idx"] + 1):
+                                        selected_bookmark_pages_to_extract.add(page_num)
+                        
+                        direct_pages_to_extract_list = parse_page_input(extract_pages_str, doc_original_for_extract.page_count)
+                        all_pages_to_extract_0_indexed = sorted(list(selected_bookmark_pages_to_extract.union(set(direct_pages_to_extract_list))))
+
+                        if not all_pages_to_extract_0_indexed: st.warning("Nenhuma página (via marcador ou direta) especificada para extração.")
                         else:
                             new_extracted_doc = fitz.open()
-                            new_extracted_doc.insert_pdf(doc_original_for_extract, selected_pages=pages_to_extract_0_indexed) 
-                            save_options = {"garbage": 4, "deflate": True, "clean": True}
-                            if optimize_pdf_extract: save_options.update({"deflate_images": True, "deflate_fonts": True})
-                            pdf_output_buffer = io.BytesIO()
-                            new_extracted_doc.save(pdf_output_buffer, **save_options); pdf_output_buffer.seek(0)
-                            st.session_state.processed_pdf_bytes_extract = pdf_output_buffer.getvalue()
-                            st.success(f"PDF com {len(pages_to_extract_0_indexed)} página(s) extraída(s) pronto!")
+                            # Garante que as páginas sejam válidas e dentro do range antes de tentar inserir
+                            valid_pages_to_extract = [p for p in all_pages_to_extract_0_indexed if 0 <= p < doc_original_for_extract.page_count]
+                            if not valid_pages_to_extract:
+                                st.warning("Nenhuma página válida selecionada para extração após verificação de intervalo.")
+                            else:
+                                new_extracted_doc.insert_pdf(doc_original_for_extract, selected_pages=valid_pages_to_extract) 
+                                save_options = {"garbage": 4, "deflate": True, "clean": True}
+                                if optimize_pdf_extract: save_options.update({"deflate_images": True, "deflate_fonts": True})
+                                pdf_output_buffer = io.BytesIO()
+                                new_extracted_doc.save(pdf_output_buffer, **save_options); pdf_output_buffer.seek(0)
+                                st.session_state.processed_pdf_bytes_extract = pdf_output_buffer.getvalue()
+                                st.success(f"PDF com {len(valid_pages_to_extract)} página(s) extraída(s) pronto!")
                     except Exception as e: st.session_state.error_message = f"Erro ao extrair páginas: {e}"; st.error(st.session_state.error_message)
                     finally: 
                         if doc_original_for_extract: doc_original_for_extract.close()
                         if new_extracted_doc: new_extracted_doc.close()
                 st.session_state.processing_extract = False
                 st.rerun()
+            
             if st.session_state.processed_pdf_bytes_extract:
                 download_filename_extract = f"{os.path.splitext(st.session_state.pdf_name)[0]}_extraido.pdf"
-                st.download_button(label="Baixar PDF Extraído", data=st.session_state.processed_pdf_bytes_extract, file_name=download_filename_extract, mime="application/pdf", key="download_extract_button_tab_extract_v10")
+                st.download_button(label="Baixar PDF Extraído", data=st.session_state.processed_pdf_bytes_extract, file_name=download_filename_extract, mime="application/pdf", key="download_extract_button_tab_extract_v10_final")
 
+        # --- ABA: GERIR PÁGINAS VISUALMENTE ---
         with tabs[tab_index_offset + 3]:
-            # ... (código da aba visual, mantido como na v9_fix)
+            # ... (Lógica da aba Visual, como na v10)
             st.header("Gerir Páginas Visualmente")
             if st.session_state.active_tab_for_preview != "visual_manage" or not st.session_state.page_previews:
                 if not st.session_state.page_previews and doc_cached and not st.session_state.generating_previews:
@@ -516,11 +520,11 @@ if st.session_state.is_single_pdf_mode and st.session_state.pdf_doc_bytes_origin
                 st.info("Clique novamente nesta aba ou carregue um PDF para gerar as pré-visualizações.")
             else:
                 st.markdown(f"Total de páginas: {len(st.session_state.page_previews)}. Selecione as páginas abaixo:")
-                num_cols_preview = st.sidebar.slider("Colunas para pré-visualização:", 2, 8, 4, key="preview_cols_slider_v10")
+                num_cols_preview = st.sidebar.slider("Colunas para pré-visualização:", 2, 8, 4, key="preview_cols_slider_v10_final")
                 cols = st.columns(num_cols_preview)
                 for i, img_bytes in enumerate(st.session_state.page_previews):
                     with cols[i % num_cols_preview]:
-                        page_key = f"select_page_preview_{i}_v10" 
+                        page_key = f"select_page_preview_{i}_v10_final" 
                         if i not in st.session_state.visual_page_selection:
                             st.session_state.visual_page_selection[i] = False
                         st.image(img_bytes, caption=f"Página {i+1}", width=120)
@@ -529,7 +533,7 @@ if st.session_state.is_single_pdf_mode and st.session_state.pdf_doc_bytes_origin
                 st.markdown(f"**Páginas selecionadas (0-indexadas):** {selected_page_indices if selected_page_indices else 'Nenhuma'}")
                 col_action1, col_action2 = st.columns(2)
                 with col_action1:
-                    if st.button("Excluir Páginas Selecionadas", key="delete_visual_button_tab_visual_v10", disabled=st.session_state.get('processing_visual_delete', False)):
+                    if st.button("Excluir Páginas Selecionadas", key="delete_visual_button_tab_visual_v10_final", disabled=st.session_state.get('processing_visual_delete', False)):
                         st.session_state.processing_visual_delete = True
                         st.session_state.processed_pdf_bytes_visual = None; st.session_state.error_message = None
                         if not selected_page_indices: st.warning("Nenhuma página selecionada para exclusão.")
@@ -553,7 +557,7 @@ if st.session_state.is_single_pdf_mode and st.session_state.pdf_doc_bytes_origin
                         st.session_state.processing_visual_delete = False
                         st.rerun()
                 with col_action2:
-                    if st.button("Extrair Páginas Selecionadas", key="extract_visual_button_tab_visual_v10", disabled=st.session_state.get('processing_visual_extract', False)):
+                    if st.button("Extrair Páginas Selecionadas", key="extract_visual_button_tab_visual_v10_final", disabled=st.session_state.get('processing_visual_extract', False)):
                         st.session_state.processing_visual_extract = True
                         st.session_state.processed_pdf_bytes_visual = None; st.session_state.error_message = None
                         if not selected_page_indices: st.warning("Nenhuma página selecionada para extração.")
@@ -577,21 +581,92 @@ if st.session_state.is_single_pdf_mode and st.session_state.pdf_doc_bytes_origin
                         st.session_state.processing_visual_extract = False
                         st.rerun()
                 if st.session_state.processed_pdf_bytes_visual:
-                    action_type_visual = "excluido_vis" if st.session_state.get('delete_visual_button_tab_visual_v10') else "extraido_vis"
+                    action_type_visual = "excluido_vis" if st.session_state.get('delete_visual_button_tab_visual_v10_final') else "extraido_vis"
                     download_filename_visual = f"{os.path.splitext(st.session_state.pdf_name)[0]}_{action_type_visual}.pdf"
-                    st.download_button(label=f"Baixar PDF ({action_type_visual.replace('_', ' ')})", data=st.session_state.processed_pdf_bytes_visual, file_name=download_filename_visual, mime="application/pdf", key="download_visual_button_tab_visual_v10")
+                    st.download_button(label=f"Baixar PDF ({action_type_visual.replace('_', ' ')})", data=st.session_state.processed_pdf_bytes_visual, file_name=download_filename_visual, mime="application/pdf", key="download_visual_button_tab_visual_v10_final")
+
+        # --- NOVA ABA: OTIMIZAR PDF ---
+        with tabs[tab_index_offset + 4]:
+            st.header("Otimizar PDF")
+            st.markdown("Aplique otimizações ao PDF principal carregado para tentar reduzir o seu tamanho.")
+
+            if not doc_cached:
+                st.warning("Carregue um PDF principal primeiro para usar esta funcionalidade.")
+            else:
+                st.subheader("Opções de Otimização:")
+                opt_garbage = st.slider("Nível de Limpeza (Garbage Collection):", 0, 4, 4, help="Remove objetos não utilizados. 0: nenhuma, 1: remove apenas objetos inválidos, 2: como 1 + remove streams duplicados, 3: como 2 + remove fontes duplicadas, 4: como 3 + remove imagens duplicadas (mais agressivo).")
+                opt_deflate = st.checkbox("Comprimir Conteúdo Geral (deflate)", value=True, help="Aplica compressão a streams de dados (texto, vetores).")
+                opt_deflate_images = st.checkbox("Comprimir Imagens", value=True, help="Aplica compressão a streams de imagens (geralmente sem perdas).")
+                opt_deflate_fonts = st.checkbox("Comprimir Fontes", value=True, help="Aplica compressão a streams de fontes incorporadas.")
+                opt_linear = st.checkbox("Linearizar PDF (Fast Web View)", value=False, help="Otimiza o PDF para carregamento rápido na web, permitindo que a primeira página seja exibida antes do download completo.")
+                # opt_clean = st.checkbox("Limpar e Reconstruir Estrutura (clean)", value=True, help="Sanitiza e reconstrói as tabelas de referência cruzada. Geralmente recomendado e implícito com garbage > 0.")
+
+
+                if st.button("Otimizar PDF e Preparar Download", key="optimize_pdf_button_v10", disabled=st.session_state.get('processing_optimize', False)):
+                    st.session_state.processing_optimize = True
+                    st.session_state.processed_pdf_bytes_optimize = None
+                    st.session_state.error_message = None
+                    
+                    doc_to_optimize = None
+                    with st.spinner("A otimizar o PDF... Por favor, aguarde."):
+                        try:
+                            # Cria uma cópia do documento em cache para não modificar o original
+                            doc_to_optimize = fitz.open(stream=doc_cached.write(), filetype="pdf")
+                            
+                            save_options = {
+                                "garbage": opt_garbage,
+                                "deflate": opt_deflate,
+                                "deflate_images": opt_deflate_images,
+                                "deflate_fonts": opt_deflate_fonts,
+                                "linear": opt_linear,
+                                "clean": True # Manter clean ativo, pois é geralmente benéfico
+                            }
+                            
+                            optimized_pdf_buffer = io.BytesIO()
+                            doc_to_optimize.save(optimized_pdf_buffer, **save_options)
+                            st.session_state.processed_pdf_bytes_optimize = optimized_pdf_buffer.getvalue()
+                            
+                            original_size_kb = len(st.session_state.pdf_doc_bytes_original) / 1024
+                            optimized_size_kb = len(st.session_state.processed_pdf_bytes_optimize) / 1024
+                            reduction_percent = ((original_size_kb - optimized_size_kb) / original_size_kb) * 100 if original_size_kb > 0 else 0
+                            
+                            st.success(f"PDF otimizado com sucesso!")
+                            st.info(f"Tamanho Original: {original_size_kb:.2f} KB")
+                            st.info(f"Tamanho Otimizado: {optimized_size_kb:.2f} KB")
+                            if reduction_percent > 0:
+                                st.info(f"Redução de tamanho: {reduction_percent:.2f}%")
+                            else:
+                                st.info("O tamanho do ficheiro não foi reduzido significativamente com as opções selecionadas (pode até ter aumentado ligeiramente em alguns casos).")
+
+                        except Exception as e:
+                            st.session_state.error_message = f"Erro durante a otimização do PDF: {e}"
+                            st.error(st.session_state.error_message)
+                        finally:
+                            if doc_to_optimize: doc_to_optimize.close()
+                    st.session_state.processing_optimize = False
+                    st.rerun()
+
+                if st.session_state.processed_pdf_bytes_optimize:
+                    download_filename_optimize = f"{os.path.splitext(st.session_state.pdf_name)[0]}_otimizado.pdf"
+                    st.download_button(
+                        label="Baixar PDF Otimizado",
+                        data=st.session_state.processed_pdf_bytes_optimize,
+                        file_name=download_filename_optimize,
+                        mime="application/pdf",
+                        key="download_optimized_pdf_button_v10"
+                    )
 
 # Exibir mensagem de erro global
 if st.session_state.error_message and not any([st.session_state.processed_pdf_bytes_remove, 
                                                 st.session_state.processed_pdf_bytes_extract, 
                                                 st.session_state.processed_pdf_bytes_visual,
                                                 st.session_state.processed_pdf_bytes_merge,
+                                                st.session_state.processed_pdf_bytes_optimize, # Adicionada verificação
                                                 st.session_state.split_pdf_parts]):
     st.error(st.session_state.error_message)
 
 st.sidebar.header("Sobre")
 st.sidebar.info(
-    "Este aplicativo permite remover, dividir, extrair, mesclar e gerir páginas de arquivos PDF. "
-    "Desenvolvido com Streamlit e PyMuPDF."
+    "Este aplicativo permite mesclar, remover, dividir, extrair, gerir visualmente e otimizar páginas de arquivos PDF. "
 )
 
