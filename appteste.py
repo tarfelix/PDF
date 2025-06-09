@@ -53,16 +53,16 @@ LEGAL_KEYWORDS = {
     "Petição Inicial": ['petição inicial', 'inicial'],
     "Defesa/Contestação": ['defesa', 'contestação'],
     "Réplica": ['réplica', 'impugnação à contestação'],
-    "Despacho": ['despacho'],
-    "Decisão": ['decisão', 'decisão interlocutória'],
     "Sentença": ['sentença'],
     "Acórdão": ['acórdão'],
+    "Decisão": ['decisão', 'decisão interlocutória'],
+    "Despacho": ['despacho'],
     "Manifestação": ['manifestação', 'petição'],
+    "Ata de Audiência": ['ata de audiência', 'termo de audiência'],
+    "Laudo": ['laudo'],
+    "Documento": ['documento'],
     "Capa": ['capa'],
     "Índice/Sumário": ['índice', 'sumário'],
-    "Documento": ['documento'],
-    "Laudo": ['laudo'],
-    "Ata de Audiência": ['ata de audiência', 'termo de audiência'],
 }
 
 
@@ -125,12 +125,9 @@ def get_pdf_metadata(pdf_bytes, filename_for_error_reporting="pdf_file"):
 def get_bookmark_ranges(pdf_doc_instance):
     bookmarks_data = []
     if not pdf_doc_instance: return bookmarks_data
-    
-    # CORREÇÃO: Em vez de checar 'has_toc', obtemos o toc e verificamos se está vazio.
     toc = pdf_doc_instance.get_toc(simple=False)
     if not toc:
-        return bookmarks_data # Retorna lista vazia se não houver marcadores
-
+        return bookmarks_data
     num_total_pages_doc = pdf_doc_instance.page_count
 
     for i, item_i in enumerate(toc):
@@ -165,16 +162,24 @@ def find_legal_sections_by_bookmark(bookmarks_data):
     found_pieces = []
     if not bookmarks_data:
         return found_pieces
+    
     for i, bookmark in enumerate(bookmarks_data):
         bookmark_title_lower = bookmark['title'].lower()
+        
+        # CORREÇÃO: Flag para garantir que um marcador seja categorizado apenas uma vez.
+        match_found = False
         for category, keywords in LEGAL_KEYWORDS.items():
             for keyword in keywords:
                 if keyword in bookmark_title_lower:
                     piece_info = bookmark.copy()
                     piece_info['category'] = category
+                    # O unique_id já era único, o problema era a duplicação na lista.
                     piece_info['unique_id'] = f"legal_{i}_{bookmark['id']}"
                     found_pieces.append(piece_info)
-                    break 
+                    match_found = True
+                    break # Para o próximo item em LEGAL_KEYWORDS
+            if match_found:
+                break # Para o próximo marcador (bookmark)
     return found_pieces
 
 
@@ -250,7 +255,6 @@ if uploaded_files:
             st.session_state.files_to_merge = uploaded_files
             st.success(f"{len(uploaded_files)} PDFs carregados para mesclagem.")
         st.rerun()
-
 elif not uploaded_files and st.session_state.last_uploaded_file_ids:
     initialize_session_state()
     get_pdf_metadata.clear()
@@ -311,8 +315,9 @@ with tabs[0]: # ABA: MESCLAR PDFS
             st.session_state.processed_pdf_bytes_merge = None
         for i_merge_list, f_obj in enumerate(st.session_state.files_to_merge):
             cols_merge_list = st.columns([0.1, 0.1, 0.8])
-            if i_merge_list > 0: cols_merge_list[0].button("⬆️", key=f"up_{f_obj.file_id}", on_click=move_file_up_merge, args=(i_merge_list,), help="Mover para cima")
-            if i_merge_list < len(st.session_state.files_to_merge) - 1: cols_merge_list[1].button("⬇️", key=f"down_{f_obj.file_id}", on_click=move_file_down_merge, args=(i_merge_list,), help="Mover para baixo")
+            # CORREÇÃO: Chaves dos botões de reordenar precisam ser únicas
+            if i_merge_list > 0: cols_merge_list[0].button("⬆️", key=f"up_{f_obj.file_id}_{i_merge_list}", on_click=move_file_up_merge, args=(i_merge_list,), help="Mover para cima")
+            if i_merge_list < len(st.session_state.files_to_merge) - 1: cols_merge_list[1].button("⬇️", key=f"down_{f_obj.file_id}_{i_merge_list}", on_click=move_file_down_merge, args=(i_merge_list,), help="Mover para baixo")
             cols_merge_list[2].write(f"{i_merge_list+1}. {f_obj.name} ({round(f_obj.size / (1024*1024), 2)} MB)")
         st.markdown("---")
         optimize_merged_pdf = st.checkbox("Otimizar PDF mesclado ao salvar", value=True, key="optimize_merged_pdf")
@@ -626,7 +631,7 @@ if st.session_state.is_single_pdf_mode and doc_cached:
                         if checkbox_key not in st.session_state:
                             st.session_state[checkbox_key] = False
                         label = f"**{piece['category']}**: {piece['title']} (Págs. {piece['start_page_0_idx'] + 1} a {piece['end_page_0_idx'] + 1})"
-                        st.checkbox(label, key=checkbox_key)
+                        st.checkbox(label, value=st.session_state[checkbox_key], key=checkbox_key)
                 st.markdown("---")
                 optimize_legal_extract = st.checkbox("Otimizar PDF extraído", value=True, key="optimize_legal_extract_checkbox")
                 if st.button("Extrair Peças Selecionadas", key="process_legal_extract_button", disabled=st.session_state.get('processing_legal_extract', False)):
