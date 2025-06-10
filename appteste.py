@@ -51,7 +51,7 @@ DEFAULT_STATE = {
 # <<< MELHORIA: Ordem ajustada e adicionadas variações sem acento para maior robustez >>>
 LEGAL_KEYWORDS = {
     "Petição Inicial": ['petição inicial', 'inicial', 'Petição Inicial'],
-    "Defesa/Contestação": ['defesa', 'contestação', 'contestacao'],
+    "Defesa/Contestação": ['Defesa', 'contestação', 'contestacao'],
     "Réplica": ['réplica', 'replica', 'impugnação à contestação', 'impugnacao a contestacao'],
     "Sentença": ['sentença', 'sentenca'],
     "Acórdão": ['acórdão', 'acordao'],
@@ -59,10 +59,10 @@ LEGAL_KEYWORDS = {
     "Despacho": ['despacho'],
     "Ata de Audiência": ['ata de audiência', 'termo de audiência'],
     "Laudo": ['laudo', 'parecer técnico'],
-    "Manifestação": ['manifestação', 'manifestacao', 'petição', 'peticao'], # Genérico, fica por último
+    "Manifestação": ['Manifestação', 'Manifestacao', 'petição', 'peticao'], # Genérico, fica por último
     "Documento": ['documento'], # Categoria para não pré-selecionar
-    "Capa": ['capa'],
-    "Índice/Sumário": ['índice', 'sumário', 'indice', 'sumario'],
+    "Capa": ['Capa'],
+    "Índice/Sumário": ['Índice', 'Sumário', 'indice', 'sumario'],
 }
 
 # <<< MELHORIA: Lista de categorias para pré-seleção, conforme solicitado >>>
