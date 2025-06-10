@@ -1,3 +1,8 @@
-streamlit>=1.32.0
-PyMuPDF>=1.23.0
-Pillow
+# --- núcleo ---
+streamlit>=1.33
+pymupdf>=1.23          # (importado como fitz)
+pillow>=9.5            # para manipular pré-visualizações PNG
+unidecode>=1.3         # remover acentuação ao comparar palavras-chave
+
+# --- opcional, mas recomendado ---
+python-dotenv>=1.0     # se quiser ler variáveis de ambiente no deploy
