@@ -66,7 +66,12 @@ LEGAL_KEYWORDS = {
 }
 
 # <<< MELHORIA: Lista de categorias para pré-seleção, conforme solicitado >>>
-PRE_SELECTED_LEGAL_CATEGORIES = ["Manifestação", "Despacho", "Sentença", "Acórdão"]
+# <<< CORREÇÃO: Pré-seleciona todas as categorias, exceto as organizacionais >>>
+PRE_SELECTED_LEGAL_CATEGORIES = [
+    "Petição Inicial", "Sentença", "Acórdão", "Decisão", "Despacho", 
+    "Defesa/Contestação", "Réplica", "Recurso", "Ata de Audiência", 
+    "Laudo", "Manifestação"
+]
 
 
 # --- Funções Auxiliares ---
