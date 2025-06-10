@@ -50,7 +50,7 @@ DEFAULT_STATE = {
 # --- PALAVRAS-CHAVE PARA O MÓDULO JURÍDICO ---
 # <<< MELHORIA: Ordem ajustada e adicionadas variações sem acento para maior robustez >>>
 LEGAL_KEYWORDS = {
-    "Petição Inicial": ['petição inicial', 'inicial'],
+    "Petição Inicial": ['petição inicial', 'inicial', 'Petição Inicial'],
     "Defesa/Contestação": ['defesa', 'contestação', 'contestacao'],
     "Réplica": ['réplica', 'replica', 'impugnação à contestação', 'impugnacao a contestacao'],
     "Sentença": ['sentença', 'sentenca'],
