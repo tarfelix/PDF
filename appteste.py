@@ -12,6 +12,7 @@ Editor e Divisor de PDF Completo (PT-BR) – Versão Refatorada e Aprimorada
 • Tratamento de erros com try/except para uma experiência mais robusta
 • Nova funcionalidade: Proteção de PDFs com senha
 • Interface da aba "Visual" aprimorada com mais controles
+• Corrigido st.experimental_rerun para st.rerun() para compatibilidade com Streamlit > 1.14
 """
 
 # ===========================================================
@@ -388,10 +389,10 @@ if is_single_pdf_mode and doc_cached:
         c1, c2 = st.sidebar.columns(2)
         if c1.button("Selecionar Todas", key="visual_select_all"):
             for i in range(doc_cached.page_count): st.session_state.visual_page_selection[i] = True
-            st.rerun()
+            st.rerun() # CORREÇÃO APLICADA
         if c2.button("Limpar Seleção", key="visual_clear_all"):
             for i in range(doc_cached.page_count): st.session_state.visual_page_selection[i] = False
-            st.rerun()
+            st.rerun() # CORREÇÃO APLICADA
         
         # Display das páginas
         cols = st.columns(n_cols)
