@@ -1,5 +1,5 @@
 # ===========================================================
-# IMPORTS E CONFIGURAÇÃO
+# IMPORTS E CONFIGURAÇÃO INICIAL
 # ===========================================================
 import streamlit as st
 import fitz  # PyMuPDF
@@ -9,90 +9,150 @@ import os
 import copy
 from unidecode import unidecode
 
+# Configura a página do Streamlit para usar o layout "wide" e define um título
 st.set_page_config(layout="wide", page_title="Editor e Divisor de PDF Completo (PT-BR)")
 
-# Constante para o limite de tamanho da aba visual
+# Constante para o limite de tamanho do arquivo que habilita a aba de preview visual.
+# Arquivos maiores que isso podem causar lentidão ou travamentos no navegador.
 VISUAL_PREVIEW_SIZE_LIMIT_MB = 50
 
 # ===========================================================
 # FUNÇÕES AUXILIARES E DE COMPATIBILIDADE
 # ===========================================================
+
 def insert_pages(dst: fitz.Document, src: fitz.Document, pages: list[int]):
+    """
+    Insere uma lista de páginas de um documento de origem (src) para um de destino (dst).
+    Esta função é projetada para ser compatível com múltiplas versões da biblioteca PyMuPDF,
+    tentando diferentes métodos de inserção e, como último recurso, inserindo uma página de cada vez,
+    que é a forma mais robusta de lidar com listas de páginas não contíguas.
+    """
     try:
+        # Tentativa para versões mais antigas que suportavam o argumento 'subpages'
         dst.insert_pdf(src, subpages=pages)
     except TypeError:
         try:
+            # Tentativa para outras versões que poderiam usar o argumento 'pages'
             dst.insert_pdf(src, pages=pages)
         except TypeError:
+            # Método de fallback mais compatível: inserir uma página de cada vez.
+            # Esta é a maneira correta para listas de páginas não contíguas em versões recentes.
             for p in pages:
                 dst.insert_pdf(src, from_page=p, to_page=p)
 
 def generate_download_button(doc_to_save, filename, button_text, optimize_options=None, password=""):
+    """
+    Salva um documento PyMuPDF em memória, aplica opções de otimização e senha,
+    e gera um botão de download no Streamlit para o arquivo resultante.
+    """
     if optimize_options is None:
         optimize_options = {}
+    
+    # Opções padrão de salvamento para limpar e comprimir o PDF
     save_opts = dict(garbage=4, deflate=True, clean=True, **optimize_options)
+    
+    # Se uma senha for fornecida, adiciona as opções de criptografia
     if password:
         save_opts.update({
-            "encryption": fitz.ENCRYPT_AES_256,
+            "encryption": fitz.ENCRYPT_AES_256,  # Criptografia forte
             "user_pw": password,
             "owner_pw": password,
             "permissions": fitz.PERM_PRINT | fitz.PERM_COPY | fitz.PERM_ANNOTATE
         })
+        
     try:
+        # Salva o documento em um buffer de bytes na memória
         buf = doc_to_save.tobytes(**save_opts)
-        doc_to_save.close()
+        doc_to_save.close() # Fecha o documento para liberar memória
+        
+        # Cria o botão de download no Streamlit
         st.download_button(label=f"⬇️ {button_text}", data=buf, file_name=filename, mime="application/pdf")
         st.success(f"Seu arquivo '{filename}' está pronto para download!")
     except Exception as e:
         st.error(f"Erro ao gerar o arquivo para download: {e}")
 
 # ===========================================================
-# ESTADO DA SESSÃO
+# GERENCIAMENTO DO ESTADO DA SESSÃO (SESSION STATE)
 # ===========================================================
+
+# Define o estado padrão inicial da aplicação
 DEFAULT_STATE = {
     'pdf_doc_bytes_original': None, 'pdf_name': None, 'bookmarks_data': [],
     'last_uploaded_file_ids': [], 'page_previews': [], 'visual_page_selection': {},
     'files_to_merge': [], 'found_legal_pieces': [],
-    'is_single_pdf_mode': False, # ESTADO AGORA É CONTROLADO AQUI
-    'visual_tab_enabled': False,
+    'is_single_pdf_mode': False, # Controla se a UI é para um ou múltiplos arquivos
+    'visual_tab_enabled': False, # Controla se a aba 'Visual' é exibida
 }
 
 def initialize_session_state():
-    """Reseta seletivamente o estado da aplicação."""
-    # Limpa chaves dinâmicas
-    dyn_keys = [k for k in st.session_state.keys() if k.startswith(("delete_bookmark_", "extract_bookmark_", "select_page_preview_", "legal_piece_", "up_", "down_")) or k.endswith(("_input", "_checkbox"))]
+    """
+    Reseta o estado da aplicação para o padrão.
+    Isso é crucial para garantir que, ao carregar novos arquivos,
+    não haja dados residuais de sessões anteriores.
+    """
+    # Limpa chaves de widgets geradas dinamicamente para evitar erros do Streamlit
+    dyn_keys = [
+        k for k in st.session_state.keys() 
+        if k.startswith((
+            "delete_bookmark_", "extract_bookmark_", "select_page_preview_", 
+            "legal_piece_", "up_", "down_"
+            )) or k.endswith(("_input", "_checkbox"))
+    ]
     for k in dyn_keys:
         st.session_state.pop(k, None)
     
-    # Recria os defaults
+    # Recria o estado padrão a partir do dicionário DEFAULT_STATE
     for k, v in DEFAULT_STATE.items():
         st.session_state[k] = copy.deepcopy(v)
 
+# Inicializa o estado apenas uma vez quando o app é carregado pela primeira vez
 if 'initialized_once' not in st.session_state:
     initialize_session_state()
     st.session_state.initialized_once = True
 
 # ===========================================================
-# PALAVRAS-CHAVE E FUNÇÕES CACHEADAS (sem alterações)
+# PALAVRAS-CHAVE E FUNÇÕES CACHEADAS
 # ===========================================================
-LEGAL_KEYWORDS = { "Petição Inicial": ['petição inicial', 'inicial'], "Defesa/Contestação": ['defesa', 'contestação', 'contestacao'], "Réplica": ['réplica', 'replica', 'impugnação à contestação', 'impugnacao a contestacao'], "Sentença": ['sentença', 'sentenca'], "Acórdão": ['acórdão', 'acordao'], "Decisão": ['decisão', 'decisao', 'decisão interlocutória', 'decisao interlocutoria'], "Despacho": ['despacho'], "Recurso": ['recurso', 'agravo', 'embargos', 'apelação', 'apelacao'], "Ata de Audiência": ['ata de audiência', 'ata de audiencia', 'termo de audiência', 'termo de audiencia'], "Laudo": ['laudo', 'parecer técnico', 'parecer tecnico'], "Manifestação": ['manifestação', 'manifestacao', 'petição', 'peticao'], "Documento": ['documento'], "Capa": ['capa'], "Índice/Sumário": ['índice', 'indice', 'sumário', 'sumario'], }
-PRE_SELECTED_LEGAL_CATEGORIES = [ "Petição Inicial", "Sentença", "Acórdão", "Decisão", "Despacho", "Defesa/Contestação", "Réplica", "Recurso", "Ata de Audiência", "Laudo", "Manifestação" ]
+
+LEGAL_KEYWORDS = {
+    "Petição Inicial": ['petição inicial', 'inicial'],
+    "Defesa/Contestação": ['defesa', 'contestação', 'contestacao'],
+    "Réplica": ['réplica', 'replica', 'impugnação à contestação', 'impugnacao a contestacao'],
+    "Sentença": ['sentença', 'sentenca'],
+    "Acórdão": ['acórdão', 'acordao'],
+    "Decisão": ['decisão', 'decisao', 'decisão interlocutória', 'decisao interlocutoria'],
+    "Despacho": ['despacho'],
+    "Recurso": ['recurso', 'agravo', 'embargos', 'apelação', 'apelacao'],
+    "Ata de Audiência": ['ata de audiência', 'ata de audiencia', 'termo de audiência', 'termo de audiencia'],
+    "Laudo": ['laudo', 'parecer técnico', 'parecer tecnico'],
+    "Manifestação": ['manifestação', 'manifestacao', 'petição', 'peticao'],
+    "Documento": ['documento'],
+    "Capa": ['capa'],
+    "Índice/Sumário": ['índice', 'indice', 'sumário', 'sumario'],
+}
+PRE_SELECTED_LEGAL_CATEGORIES = [
+    "Petição Inicial", "Sentença", "Acórdão", "Decisão", "Despacho", 
+    "Defesa/Contestação", "Réplica", "Recurso", "Ata de Audiência", "Laudo", "Manifestação"
+]
 
 @st.cache_resource(show_spinner="Gerando miniaturas do PDF...")
 def build_previews(pdf_bytes: bytes, dpi=48):
+    """Gera imagens PNG de cada página do PDF para a aba 'Visual'."""
     with fitz.open(stream=pdf_bytes, filetype="pdf") as doc:
         return [pg.get_pixmap(matrix=fitz.Matrix(dpi / 72, dpi / 72)).tobytes("png") for pg in doc]
 
 @st.cache_data(max_entries=5, show_spinner="Analisando metadados do PDF...")
 def get_pdf_metadata(pdf_bytes: bytes, name="pdf"):
+    """Extrai os marcadores (bookmarks) e a contagem de páginas de um PDF."""
     try:
         with fitz.open(stream=pdf_bytes, filetype="pdf") as d:
             return get_bookmark_ranges(d), d.page_count, None
     except Exception as e:
-        return [], 0, f"Erro ao ler {name}: {e}"
+        return [], 0, f"Erro ao ler o arquivo {name}: {e}"
 
 @st.cache_resource(show_spinner="Carregando documento PDF...")
 def get_pdf_document(_pdf_bytes):
+    """Abre um documento PDF a partir de bytes e o mantém em cache."""
     if not _pdf_bytes: return None
     try:
         return fitz.open(stream=_pdf_bytes, filetype="pdf")
@@ -101,6 +161,11 @@ def get_pdf_document(_pdf_bytes):
         return None
 
 def get_bookmark_ranges(doc: fitz.Document):
+    """
+    Processa o sumário (TOC) do PDF para determinar o intervalo de páginas de cada marcador.
+    A lógica deduz a página final de um marcador observando a página inicial do próximo marcador
+    de nível hierárquico igual ou superior.
+    """
     toc = doc.get_toc(simple=False)
     res = []
     for i, (lvl, title, page1, *_) in enumerate(toc):
@@ -116,6 +181,7 @@ def get_bookmark_ranges(doc: fitz.Document):
     return res
 
 def find_legal_sections(bms):
+    """Identifica peças jurídicas com base em palavras-chave nos títulos dos marcadores."""
     out = []
     for i, bm in enumerate(bms):
         norm = unidecode(bm['title']).lower()
@@ -126,6 +192,7 @@ def find_legal_sections(bms):
     return out
 
 def parse_page_input(inp: str, max1: int):
+    """Converte uma string de entrada (ex: '1, 3-5, 10') em uma lista de índices de página."""
     sel = set()
     if not inp: return []
     for part in inp.split(','):
@@ -140,11 +207,11 @@ def parse_page_input(inp: str, max1: int):
                 p = int(part)
                 if 1 <= p <= max1: sel.add(p - 1)
         except ValueError:
-            st.warning(f"Entrada inválida: '{part}'")
+            st.warning(f"Entrada inválida ignorada: '{part}'")
     return sorted(list(sel))
 
 # ===========================================================
-# INTERFACE PRINCIPAL
+# INTERFACE PRINCIPAL DO STREAMLIT
 # ===========================================================
 st.title("✂️ Editor e Divisor de PDF Completo (PT-BR)")
 st.markdown("Carregue um ou mais PDFs. **Arquivos muito grandes (> 50 MB) terão a aba 'Visual' desabilitada para evitar travamentos.**")
@@ -153,22 +220,24 @@ st.sidebar.button("🔄 Limpar Tudo e Recomeçar", on_click=initialize_session_s
 
 uploaded_files = st.file_uploader("📄 Carregue seu(s) PDF(s) aqui", type="pdf", accept_multiple_files=True)
 
-# ---------------- LÓGICA DE UPLOAD E ESTADO (CORRIGIDA) -----------------
+# ---------------- LÓGICA DE UPLOAD E ATUALIZAÇÃO DE ESTADO -----------------
 if uploaded_files:
     file_ids = sorted(f.file_id for f in uploaded_files)
+    # Se a lista de arquivos mudou, reseta todo o estado para começar do zero
     if file_ids != st.session_state.last_uploaded_file_ids:
         initialize_session_state()
         st.session_state.last_uploaded_file_ids = file_ids
 
+        # Modo de edição de arquivo único
         if len(uploaded_files) == 1:
-            st.session_state.is_single_pdf_mode = True # Define o modo no session_state
+            st.session_state.is_single_pdf_mode = True
             uploaded_file = uploaded_files[0]
             
             file_size_mb = uploaded_file.size / (1024 * 1024)
             st.session_state.visual_tab_enabled = file_size_mb <= VISUAL_PREVIEW_SIZE_LIMIT_MB
 
             if not st.session_state.visual_tab_enabled:
-                st.warning(f"⚠️ Arquivo grande ({file_size_mb:.1f} MB). A aba 'Visual' foi desabilitada para evitar travamentos.")
+                st.warning(f"⚠️ Arquivo grande ({file_size_mb:.1f} MB). A aba 'Visual' foi desabilitada.")
 
             st.session_state.pdf_doc_bytes_original = uploaded_file.getvalue()
             st.session_state.pdf_name = uploaded_file.name
@@ -176,32 +245,35 @@ if uploaded_files:
             bms, pages, err = get_pdf_metadata(st.session_state.pdf_doc_bytes_original, st.session_state.pdf_name)
             if err:
                 st.error(err)
-                st.session_state.is_single_pdf_mode = False
+                st.session_state.is_single_pdf_mode = False # Falha ao ler, desativa modo single
             else:
                 st.session_state.bookmarks_data = bms
                 st.session_state.found_legal_pieces = find_legal_sections(bms)
-                st.info(f"PDF '{st.session_state.pdf_name}' ({pages} páginas) carregado.")
-        else:
-            st.session_state.is_single_pdf_mode = False # Define o modo no session_state
-            st.session_state.files_to_merge = uploaded_files
-            st.info(f"{len(uploaded_files)} arquivos carregados e prontos para a aba 'Mesclar'.")
+                st.info(f"PDF '{st.session_state.pdf_name}' ({pages} páginas) carregado. Use as abas abaixo para editar.")
         
+        # Modo de mesclagem de múltiplos arquivos
+        else:
+            st.session_state.is_single_pdf_mode = False
+            st.session_state.files_to_merge = uploaded_files
+            st.info(f"{len(uploaded_files)} arquivos carregados. Vá para a aba 'Mesclar' para continuar.")
+        
+        # st.rerun() força o script a re-executar com o novo estado atualizado
         st.rerun()
 
-# ------------- CRIAÇÃO DAS ABAS (LÓGICA CORRIGIDA) --------------------
+# ------------- CRIAÇÃO DINÂMICA DAS ABAS --------------------
 tabs_to_show = []
-# A lógica agora lê diretamente do session_state
 if st.session_state.get('is_single_pdf_mode', False):
     tabs_to_show.append("Peças Jurídicas")
     if st.session_state.get('visual_tab_enabled', False):
         tabs_to_show.append("Visual")
     tabs_to_show.extend(["Remover", "Extrair", "Dividir", "Otimizar"])
 
-tabs_to_show.append("Mesclar")
+tabs_to_show.append("Mesclar") # A aba Mesclar está sempre disponível
 
 active_tabs = st.tabs(tabs_to_show)
 tab_map = {name: tab for name, tab in zip(tabs_to_show, active_tabs)}
 
+# Carrega o documento PDF em cache se estiver no modo de arquivo único
 doc_cached = None
 if st.session_state.get('is_single_pdf_mode', False):
     doc_cached = get_pdf_document(st.session_state.pdf_doc_bytes_original)
@@ -211,46 +283,58 @@ if st.session_state.get('is_single_pdf_mode', False):
     base_name = os.path.splitext(st.session_state.pdf_name)[0]
 
 # ===========================================================
-# CÓDIGO DAS ABAS (sem alterações, mas agora com `if "NomeAba" in tab_map`)
+# RENDERIZAÇÃO DO CONTEÚDO DE CADA ABA
 # ===========================================================
 
 if "Mesclar" in tab_map:
     with tab_map["Mesclar"]:
         st.header("🔗 Mesclar Múltiplos PDFs")
-        files_to_merge = st.session_state.get('files_to_merge', [])
-        if not files_to_merge and not st.session_state.get('is_single_pdf_mode'):
+        
+        files_to_merge_list = st.session_state.get('files_to_merge', [])
+
+        if not files_to_merge_list:
             st.info("Para mesclar, carregue dois ou mais arquivos PDF no campo de upload acima.")
-        elif st.session_state.get('is_single_pdf_mode') and len(files_to_merge) <= 1:
-            st.warning("Você carregou apenas um arquivo. Para mesclar, carregue múltiplos arquivos.")
-        elif files_to_merge:
+            if st.session_state.get('is_single_pdf_mode'):
+                 st.warning("Você está no modo de edição de arquivo único. Para ativar a mesclagem, carregue múltiplos arquivos.")
+        else:
             def move_file(i, delta):
-                st.session_state.files_to_merge[i + delta], st.session_state.files_to_merge[i] = st.session_state.files_to_merge[i], st.session_state.files_to_merge[i + delta]
-            for i, f in enumerate(files_to_merge):
+                files = st.session_state.files_to_merge
+                files[i + delta], files[i] = files[i], files[i + delta]
+
+            st.write("Use os botões ⬆️ e ⬇️ para reordenar os arquivos. A mesclagem seguirá a ordem de cima para baixo.")
+            for i, f in enumerate(files_to_merge_list):
                 c_up, c_down, c_lbl = st.columns([0.08, 0.08, 0.84])
                 if i > 0: c_up.button("⬆️", key=f"up_{i}", on_click=move_file, args=(i, -1))
-                if i < len(files_to_merge) - 1: c_down.button("⬇️", key=f"dn_{i}", on_click=move_file, args=(i, 1))
+                # ### BUG CORRIGIDO AQUI ###
+                # A chave foi alterada de "dn_{i}" para "down_{i}" para corresponder à lógica de limpeza do estado.
+                if i < len(files_to_merge_list) - 1: c_down.button("⬇️", key=f"down_{i}", on_click=move_file, args=(i, 1))
                 c_lbl.write(f"**{i + 1}.** {f.name} ({round(f.size / 1_048_576, 2)} MB)")
+            
             st.divider()
             col1, col2 = st.columns(2)
             optimize_merge = col1.checkbox("Otimizar PDF resultante", value=True, help="Reduz o tamanho do arquivo final.")
             password_merge = col2.text_input("Senha para o PDF (opcional)", type="password", key="pass_merge")
+            
             if st.button("Executar Mesclagem", type="primary"):
                 try:
                     with st.spinner("Mesclando arquivos..."):
                         merged_doc = fitz.open()
-                        for f in files_to_merge:
-                            with fitz.open(stream=f.getvalue(), filetype="pdf") as src_doc:
+                        for f_to_merge in st.session_state.files_to_merge:
+                            with fitz.open(stream=f_to_merge.getvalue(), filetype="pdf") as src_doc:
                                 merged_doc.insert_pdf(src_doc)
                         generate_download_button(merged_doc, "documento_mesclado.pdf", "Baixar PDF Mesclado", {"deflate_images": optimize_merge, "deflate_fonts": optimize_merge}, password_merge)
                 except Exception as e:
                     st.error(f"Ocorreu um erro durante a mesclagem: {e}")
 
+# As abas a seguir só são renderizadas se estivermos no modo de arquivo único e o documento for válido
 if st.session_state.get('is_single_pdf_mode') and doc_cached:
     if "Peças Jurídicas" in tab_map:
         with tab_map["Peças Jurídicas"]:
             st.header("⚖️ Extrair Peças Jurídicas (por Marcadores)")
             pcs = st.session_state.found_legal_pieces
-            if not pcs: st.warning("Nenhuma peça jurídica foi reconhecida automaticamente pelos marcadores (bookmarks) deste PDF.")
+            if not pcs: 
+                st.warning("Nenhuma peça jurídica foi reconhecida automaticamente pelos marcadores (bookmarks) deste PDF.")
+                st.info("Dica: Use a aba 'Extrair' ou 'Visual' para selecionar páginas manualmente.")
             else:
                 col1, col2, col3 = st.columns(3)
                 if col1.button("Selecionar todas as peças"):
@@ -291,40 +375,48 @@ if st.session_state.get('is_single_pdf_mode') and doc_cached:
             st.sidebar.divider()
             st.sidebar.subheader("Controles Visuais")
             n_cols = st.sidebar.slider("Colunas de visualização", 2, 10, 5, key="visual_cols")
-            sel_pages = [i for i, v in st.session_state.visual_page_selection.items() if v]
-            st.sidebar.info(f"**{len(sel_pages)}** de {doc_cached.page_count} páginas selecionadas.")
+            
+            sel_pages_indices = [i for i, v in st.session_state.visual_page_selection.items() if v]
+            
+            st.sidebar.info(f"**{len(sel_pages_indices)}** de {doc_cached.page_count} páginas selecionadas.")
             c1, c2 = st.sidebar.columns(2)
-            if c1.button("Selecionar Todas", key="visual_select_all"):
+            
+            def select_all_visual():
                 for i in range(doc_cached.page_count): st.session_state.visual_page_selection[i] = True
-                st.rerun()
-            if c2.button("Limpar Seleção", key="visual_clear_all"):
-                for i in range(doc_cached.page_count): st.session_state.visual_page_selection[i] = False
-                st.rerun()
+            def clear_all_visual():
+                st.session_state.visual_page_selection = {}
+            
+            c1.button("Selecionar Todas", key="visual_select_all", on_click=select_all_visual)
+            c2.button("Limpar Seleção", key="visual_clear_all", on_click=clear_all_visual)
+            
             cols = st.columns(n_cols)
             for i, img_bytes in enumerate(st.session_state.page_previews):
                 with cols[i % n_cols]:
-                    st.image(img_bytes, use_column_width=True)
-                    key = f"select_page_preview_{i}"
-                    if key not in st.session_state: st.session_state[key] = st.session_state.visual_page_selection.get(i, False)
-                    st.session_state.visual_page_selection[i] = st.checkbox(f"Pág. {i + 1}", key=key, value=st.session_state.visual_page_selection.get(i, False))
+                    st.image(img_bytes, use_column_width=True, caption=f"Pág. {i+1}")
+                    current_value = st.session_state.visual_page_selection.get(i, False)
+                    # A atualização do estado da seleção é feita diretamente pelo fluxo do Streamlit
+                    st.session_state.visual_page_selection[i] = st.checkbox(f"Selecionar", key=f"select_page_preview_{i}", value=current_value)
+            
             st.divider()
             password_visual = st.text_input("Senha para o PDF (opcional)", type="password", key="pass_visual")
             col_del, col_ext = st.columns(2)
-            if col_del.button("🗑️ Excluir Selecionadas", disabled=not sel_pages):
-                if len(sel_pages) >= doc_cached.page_count: st.error("Não é possível excluir todas as páginas do documento.")
+            
+            if col_del.button("🗑️ Excluir Selecionadas", disabled=not sel_pages_indices):
+                if len(sel_pages_indices) >= doc_cached.page_count: st.error("Não é possível excluir todas as páginas do documento.")
                 else:
                     try:
                         with st.spinner("Excluindo páginas..."):
                             new_doc = fitz.open(stream=st.session_state.pdf_doc_bytes_original)
-                            new_doc.delete_pages(sel_pages)
+                            new_doc.delete_pages(sel_pages_indices)
                             generate_download_button(new_doc, f"{base_name}_excluido.pdf", "Baixar PDF Modificado", password=password_visual)
                     except Exception as e:
                         st.error(f"Erro ao excluir páginas: {e}")
-            if col_ext.button("✨ Extrair Selecionadas", disabled=not sel_pages):
+
+            if col_ext.button("✨ Extrair Selecionadas", disabled=not sel_pages_indices):
                 try:
                     with st.spinner("Extraindo páginas..."):
                         new_doc = fitz.open()
-                        insert_pages(new_doc, doc_cached, sel_pages)
+                        insert_pages(new_doc, doc_cached, sel_pages_indices)
                         generate_download_button(new_doc, f"{base_name}_extraido_visual.pdf", "Baixar PDF Extraído", password=password_visual)
                 except Exception as e:
                     st.error(f"Erro ao extrair páginas: {e}")
