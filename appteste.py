@@ -716,21 +716,48 @@ if st.session_state.get('is_single_pdf_mode') and doc_cached and "Dividir" in ta
                     with st.spinner("Dividindo por marcadores..."):
                         parts = []
                         for bm in st.session_state.bookmarks_data:
-                            if bm.get("level",1)!=level: continue
-                            if filt and filt.lower() not in bm["title"].lower(): continue
+                            if bm.get("level", 1) != level:
+                                continue
+                            if filt and filt.lower() not in bm["title"].lower():
+                                continue
+
                             part = fitz.open()
-                            insert_pages(part, doc_cached, list(range(bm['start_page_0_idx'], bm['end_page_0_idx']+1)))
-                            parts.append((f"{base_name}_{safe_slug(bm['title'])}.pdf",
-                                          part.tobytes(garbage=3, deflate=True, clean=True,
-                                                       deflate_images=opt, deflate_fonts=opt)))
+                            insert_pages(
+                                part,
+                                doc_cached,
+                                list(range(
+                                    bm['start_page_0_idx'],
+                                    bm['end_page_0_idx'] + 1
+                                ))
+                            )
+                            parts.append((
+                                f"{base_name}_{safe_slug(bm['title'])}.pdf",
+                                part.tobytes(
+                                    garbage=3,
+                                    deflate=True,
+                                    clean=True,
+                                    deflate_images=opt,
+                                    deflate_fonts=opt
+                                )
+                            ))
                             part.close()
+
                         if not parts:
                             st.warning("Nenhum marcador encontrado.")
                         else:
                             zb = io.BytesIO()
                             with zipfile.ZipFile(zb, 'w', zipfile.ZIP_DEFLATED) as zf:
-                                for name,data in parts: zf.writestr(name, data)
-                            st.download_button("⬇️ Baixar ZIP", zb.getvalue(), f"{base_name}_por_marcadores.zip", "application/zip")
+                                for name, data in parts:
+                                    zf.writestr(name, data)
+                            st.download_button(
+                                "⬇️ Baixar ZIP",
+                                zb.getvalue(),
+                                f"{base_name}_por_marcadores.zip",
+                                "application/zip"
+                            )
+                except Exception as e:
+                    st.error(f"Erro ao dividir por marcadores: {e}")
+
 
 # ---------- Otimizar ----------
 if st.session_state.get('is_single_pdf_mode') and doc_cached and "Otimizar" in tab_map:
