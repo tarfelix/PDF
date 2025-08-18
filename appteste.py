@@ -736,41 +736,31 @@ if st.session_state.get('is_single_pdf_mode') and doc_cached and "Dividir" in ta
 if st.session_state.get('is_single_pdf_mode') and doc_cached and "Otimizar" in tab_map:
     with tab_map["Otimizar"]:
         st.header("🚀 Otimizar PDF")
-
-        # Seleção de perfil de otimização
-        profile = st.selectbox("Perfil", ("Leve", "Recomendada", "Máxima"), index=1)
-
-        # Senha opcional
+        profile = st.selectbox("Perfil", ("Leve","Recomendada","Máxima"), index=1)
         pwd = st.text_input("Senha (opcional)", type="password", key="pass_opt")
-
-        # Opções adicionais
         c1, c2 = st.columns(2)
         rm_meta = c1.checkbox("Remover metadados", True)
         rm_ann = c2.checkbox("Remover anotações", False)
 
-        # Botão de ação
         if st.button("Otimizar Agora", type="primary"):
             try:
                 with st.spinner("Otimizando..."):
-                    # Configurações de otimização conforme perfil
                     opt = {}
                     if profile == "Leve":
                         opt.update(garbage=2, deflate=True)
                     elif profile == "Recomendada":
                         opt.update(garbage=4, deflate=True,
                                    deflate_images=True, deflate_fonts=True)
-                    else:  # Máxima
+                    else:
                         opt.update(garbage=4, deflate=True,
                                    deflate_images=True, deflate_fonts=True,
                                    linear=True, clean=True)
 
-                    # Abre documento original da sessão
                     doc = fitz.open(
                         stream=st.session_state.pdf_doc_bytes_original,
                         filetype="pdf"
                     )
 
-                    # Gera botão de download
                     generate_download_button(
                         doc,
                         f"{base_name}_otimizado.pdf",
@@ -780,7 +770,5 @@ if st.session_state.get('is_single_pdf_mode') and doc_cached and "Otimizar" in t
                         remove_metadata=rm_meta,
                         remove_annotations=rm_ann
                     )
-
             except Exception as e:
                 st.error(f"Erro ao otimizar: {e}")
-
