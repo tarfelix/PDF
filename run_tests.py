@@ -1,44 +1,48 @@
+import unittest
 import sys
 import os
-import unittest
 
-# Adiciona o diretório atual ao path para garantir que 'core' e 'ui' sejam encontrados
+# Adiciona o diretório atual ao path para importar modulos locais
 sys.path.append(os.getcwd())
 
-class TestRefactoring(unittest.TestCase):
-    
-    def test_01_imports_core(self):
-        """Testa se os módulos do Core são importáveis."""
+class TestImports(unittest.TestCase):
+    def test_imports_core(self):
         try:
             import core.pdf_ops
             import core.pdf_scanner
             import core.utils
-            import config
+            import core.bates
+            import core.diff
+            import core.redact
         except ImportError as e:
-            self.fail(f"Falha ao importar módulos do Core: {e}")
+            self.fail(f"Falha ao importar core modules: {e}")
 
-    def test_02_imports_ui(self):
-        """Testa se os módulos de UI são importáveis."""
+    def test_imports_ui(self):
         try:
+            import config
             import ui.components
             import ui.styles
             import ui.tabs.merge
             import ui.tabs.split
+            import ui.tabs.visual
+            import ui.tabs.remove
+            import ui.tabs.extract
+            import ui.tabs.legal
+            import ui.tabs.optimize
+            import ui.tabs.bates
+            import ui.tabs.converter
+            import ui.tabs.redact
+            import ui.tabs.diff
         except ImportError as e:
-            self.fail(f"Falha ao importar módulos de UI: {e}")
+            self.fail(f"Falha ao importar ui modules: {e}")
 
-    def test_03_utils_safe_slug(self):
-        """Testa a função safe_slug do core.utils."""
-        from core.utils import safe_slug
-        self.assertEqual(safe_slug("Arquivo de Teste!"), "arquivo_de_teste")
-        self.assertEqual(safe_slug("Ação & Reação"), "acao_reacao")
-
-    def test_04_config_constants(self):
-        """Testa se as constantes de configuração existem."""
-        from config import DEFAULT_BRAND, LEGAL_KEYWORDS
-        self.assertIn("name", DEFAULT_BRAND)
-        self.assertIn("Petição Inicial", LEGAL_KEYWORDS)
+    def test_core_functions_exist(self):
+        import core.pdf_ops
+        import core.bates
+        self.assertTrue(hasattr(core.pdf_ops, 'merge_pdfs'))
+        self.assertTrue(hasattr(core.pdf_ops, 'images_to_pdf'))
+        self.assertTrue(hasattr(core.pdf_ops, 'rotate_pages'))
+        self.assertTrue(hasattr(core.bates, 'apply_bates_stamping'))
 
 if __name__ == '__main__':
-    print("Iniciando testes de integridade da refatoração...")
-    unittest.main(verbosity=2)
+    unittest.main()

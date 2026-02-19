@@ -1,0 +1,38 @@
+import streamlit as st
+import fitz
+from core.redact import redact_text_matches
+from ui.components import render_download_button
+import os
+
+def render(doc_cached: fitz.Document, pdf_bytes_original: bytes, pdf_name: str):
+    st.header("🕵️ Redação e Anonimização (LGPD)")
+    st.warning("Atenção: A redação remove permanentemente o texto e coloca uma tarja preta. É irreversível.")
+    
+    st.subheader("Redação por Palavras-Chave")
+    st.info("Digite termos sensíveis (ex: CPF, nomes, valores) para cobrí-los automaticamente em todo o documento.")
+    
+    terms_input = st.text_area("Termos para ocultar (um por linha)", height=100)
+    
+    c1, c2 = st.columns(2)
+    case_insensitive = c1.checkbox("Ignorar Maiúsculas/Minúsculas", True)
+    
+    if st.button("Aplicar Tarja Preta", type="primary"):
+        if not terms_input.strip():
+            st.error("Digite pelo menos um termo.")
+            return
+
+        terms = [t.strip() for t in terms_input.split('\n') if t.strip()]
+        
+        try:
+            with st.spinner("Buscando e aplicando redação..."):
+                new_bytes, count = redact_text_matches(pdf_bytes_original, terms, ignore_case=case_insensitive)
+                
+                if count == 0:
+                    st.warning("Nenhuma ocorrência encontrada para os termos informados.")
+                else:
+                    st.success(f"Sucesso! {count} ocorrências ocultadas.")
+                    base_name = os.path.splitext(pdf_name)[0]
+                    render_download_button(new_bytes, f"{base_name}_tarjado.pdf", "⬇️ Baixar PDF com Tarjas")
+                    
+        except Exception as e:
+            st.error(f"Erro na redação: {e}")

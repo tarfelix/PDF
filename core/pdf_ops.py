@@ -13,6 +13,20 @@ def optimize_pdf(doc: fitz.Document, options: Optional[Dict[str, Any]] = None) -
     
     return doc.tobytes(**save_opts)
 
+def rotate_pages(pdf_bytes: bytes, rotations: Dict[int, int], optimize: bool = True) -> bytes:
+    """
+    Aplica rotação nas páginas especificadas.
+    rotations: Dict onde chave é índice da página (0-based) e valor é o ângulo (90, 180, 270).
+    """
+    doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+    
+    for page_idx, angle in rotations.items():
+        if 0 <= page_idx < doc.page_count:
+            doc[page_idx].set_rotation(angle)
+            
+    opts: Dict[str, Any] = {"deflate_images": optimize, "deflate_fonts": optimize}
+    return optimize_pdf(doc, opts)
+
 def merge_pdfs(pdf_list: List[Any], optimize: bool = True, password: Optional[str] = None) -> bytes:
     """
     Mescla uma lista de arquivos PDF.
@@ -143,3 +157,25 @@ def split_pdf_by_size(pdf_bytes: bytes, max_mb: float, optimize: bool = True) ->
     
     cur_doc.close()
     return parts
+
+def images_to_pdf(image_list: List[Any], optimize: bool = True) -> bytes:
+    """Converte lista de imagens (bytes ou file-like) em um único PDF."""
+    doc = fitz.open()
+    for img_data in image_list:
+        # Se for UploadedFile do Streamlit
+        stream = img_data.getvalue() if hasattr(img_data, 'getvalue') else img_data
+        
+        # Abre imagem como documento fitz
+        try:
+            with fitz.open(stream=stream) as img_doc:
+                # Converte para PDF (retorna bytes)
+                pdf_bytes = img_doc.convert_to_pdf()
+                with fitz.open("pdf", pdf_bytes) as pdf_page:
+                    doc.insert_pdf(pdf_page)
+        except Exception as e:
+            # Se falhar uma imagem, podemos logar ou pular (ou estourar erro)
+            # Estamos estourando para o UI tratar
+            raise RuntimeError(f"Falha ao converter imagem: {e}")
+            
+    opts: Dict[str, Any] = {"deflate_images": optimize, "deflate_fonts": optimize}
+    return optimize_pdf(doc, opts)

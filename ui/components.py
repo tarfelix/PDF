@@ -3,10 +3,16 @@ import fitz
 from ui.styles import inject_brand_css
 
 @st.cache_resource(show_spinner="Gerando miniaturas...")
-def build_previews(pdf_bytes: bytes, dpi=48):
-    """Gera imagens de preview para visualização."""
+def build_previews(pdf_bytes: bytes, dpi=48, rotations: dict = None):
+    """Gera imagens de preview para visualização, aplicando rotações se fornecidas."""
+    if rotations is None: rotations = {}
     with fitz.open(stream=pdf_bytes, filetype="pdf") as doc:
-        return [pg.get_pixmap(matrix=fitz.Matrix(dpi/72, dpi/72)).tobytes("png") for pg in doc]
+        previews = []
+        for i, pg in enumerate(doc):
+            if i in rotations:
+                pg.set_rotation(rotations[i])
+            previews.append(pg.get_pixmap(matrix=fitz.Matrix(dpi/72, dpi/72)).tobytes("png"))
+        return previews
 
 @st.cache_data(max_entries=5, show_spinner="Lendo sumário...")
 def get_pdf_metadata_cached(pdf_bytes: bytes, name="pdf"):

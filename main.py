@@ -4,7 +4,9 @@ import os
 import copy
 from config import DEFAULT_BRAND, VISUAL_PREVIEW_SIZE_LIMIT_MB
 from ui.components import brand_header, get_pdf_metadata_cached, get_pdf_document
-from ui.tabs import merge, split, visual, remove, extract, legal, optimize
+
+# Import dinâmico das abas
+from ui.tabs import merge, split, visual, remove, extract, legal, optimize, bates, converter, redact, diff
 
 # --- Configuração Inicial ---
 st.set_page_config(layout="wide", page_title="Editor e Divisor de PDF — v3")
@@ -29,18 +31,14 @@ DEFAULT_STATE = {
 
 def initialize_session_state():
     """Reseta o estado da sessão."""
-    # Remove chaves dinâmicas
     dyn = [k for k in st.session_state.keys()
            if k.startswith(("delete_bookmark_", "extract_bookmark_", "select_page_preview_",
-                            "legal_piece_", "marker_piece_", "up_", "down_", "reord_"))
+                            "legal_piece_", "marker_piece_", "up_", "down_", "reord_", "visual_rotations"))
            or k.endswith(("_input", "_checkbox"))]
     for k in dyn: st.session_state.pop(k, None)
     
-    # Restaura defaults
     for k, v in DEFAULT_STATE.items():
         if k == "brand":
-            # Preserva customização de branding se não for explicitamente resetada
-            # Mas aqui vamos resetar tudo conforme o original
             st.session_state[k] = DEFAULT_BRAND.copy()
         else:
             st.session_state[k] = copy.deepcopy(v)
@@ -113,7 +111,6 @@ if uploaded_files:
                 st.session_state.is_single_pdf_mode = False
             else:
                 st.session_state.bookmarks_data = bms
-                # found_legal_pieces será calculado na aba Legal se necessário
                 st.info(f"PDF '{f.name}' ({pages} páginas) carregado. Use as abas abaixo.")
         else:
             st.session_state.is_single_pdf_mode = False
@@ -126,9 +123,15 @@ if uploaded_files:
 tabs = []
 if st.session_state.get('is_single_pdf_mode', False):
     tabs.append("Peças Jurídicas")
+    tabs.append("Numeração (Bates)")
+    tabs.append("Redação (Tarja)")
     if st.session_state.get('visual_tab_enabled', False):
         tabs.append("Visual")
     tabs += ["Remover", "Extract", "Dividir", "Otimizar"]
+elif not st.session_state.get('files_to_merge', []):
+    tabs.append("Converter Imagens")
+    tabs.append("Comparar Versões")
+
 tabs.append("Mesclar")
 
 tab_objs = st.tabs(tabs)
@@ -148,11 +151,27 @@ if st.session_state.get('is_single_pdf_mode', False) and st.session_state.pdf_do
 if "Mesclar" in tab_map:
     with tab_map["Mesclar"]:
         merge.render(st.session_state.get('files_to_merge', []))
+        
+if "Converter Imagens" in tab_map:
+    with tab_map["Converter Imagens"]:
+        converter.render()
+        
+if "Comparar Versões" in tab_map:
+    with tab_map["Comparar Versões"]:
+        diff.render()
 
 if st.session_state.get('is_single_pdf_mode') and doc_cached:
     if "Peças Jurídicas" in tab_map:
         with tab_map["Peças Jurídicas"]:
             legal.render(doc_cached, st.session_state.pdf_name, st.session_state.bookmarks_data)
+
+    if "Numeração (Bates)" in tab_map:
+        with tab_map["Numeração (Bates)"]:
+            bates.render(doc_cached, st.session_state.pdf_doc_bytes_original, st.session_state.pdf_name)
+
+    if "Redação (Tarja)" in tab_map:
+        with tab_map["Redação (Tarja)"]:
+            redact.render(doc_cached, st.session_state.pdf_doc_bytes_original, st.session_state.pdf_name)
 
     if "Visual" in tab_map:
         with tab_map["Visual"]:
