@@ -11,6 +11,7 @@ from core.utils import safe_slug
 def render(doc_cached: fitz.Document, pdf_name: str, bookmarks_unused=None, pdf_bytes_original: bytes = None):
     st.header("⚖️ Identificador de Peças (Smart Scan)")
     st.caption("Localiza peças jurídicas usando marcadores ou inteligência de texto (para PDFs digitalizados).")
+    # print(f"DEBUG: render legal called with pdf_bytes={len(pdf_bytes_original) if pdf_bytes_original else 0} bytes")
     
     # Init state
     if "legal_found_items" not in st.session_state:
