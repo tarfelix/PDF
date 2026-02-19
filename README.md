@@ -35,3 +35,11 @@ mesclar, dividir, extrair páginas, otimizar e identificar/recortar peças jurí
 
 ```bash
 pip install -r requirements.txt
+streamlit run main.py
+```
+
+## Estrutura do Projeto (Refatorado v3)
+- `main.py`: Arquivo principal.
+- `core/`: Lógica de processamento de PDF.
+- `ui/`: Interface gráfica.
+- `config.py`: Configurações de marca e palavras-chave.
