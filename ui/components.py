@@ -48,13 +48,13 @@ def brand_header(brand: dict, high_contrast: bool):
     </div>
     """, unsafe_allow_html=True)
 
-def render_download_button(data: bytes, filename: str, label: str):
+def render_download_button(data: bytes, filename: str, label: str, mime_type: str = "application/pdf"):
     """Wrapper consistente para download buttons."""
-    col1, _ = st.columns([0.4, 0.6]) # Ajuste de layout se necessário
+    # col1, _ = st.columns([0.4, 0.6]) # Ajuste de layout se necessário
     st.download_button(
         label=f"⬇️ {label}",
         data=data,
         file_name=filename,
-        mime="application/pdf"
+        mime=mime_type
     )
     st.success(f"Arquivo pronto: {filename}")

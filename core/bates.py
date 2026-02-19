@@ -30,33 +30,36 @@ def apply_bates_stamping(
         # Aqui assumimos um único PDF sendo carimbado, então doc_idx é fixo
         current_text = text_pattern.format(doc_idx=start_doc_idx, page_idx=start_page_idx + i)
         
-        # Define ponto de inserção
-        p = fitz.Point(0, 0)
-        align = 0
+        # Define retangulo para inserção (caixa de texto)
+        # Altura suficiente para o texto
+        h_text = font_size * 2
         
         if "top" in position:
-            y = margin + font_size
+            y0 = margin
+            y1 = margin + h_text
         else:
-            y = h - margin
+            y0 = h - margin - h_text
+            y1 = h - margin
             
         if "left" in position:
-            x = margin
             align = 0
         elif "center" in position:
-            x = w / 2
             align = 1
         else: # right
-            x = w - margin
             align = 2
             
-        p = fitz.Point(x, y)
+        # Margem horizontal
+        x0 = margin
+        x1 = w - margin
+        
+        rect_insert = fitz.Rect(x0, y0, x1, y1)
         
         # Insere texto
-        page.insert_text(
-            p,
+        page.insert_textbox(
+            rect_insert,
             current_text,
             fontsize=font_size,
-            fontname="tiro", # Times Roman standard
+            fontname="tiro", # Times Roman standard (serif)
             color=color,
             align=align
         )

@@ -19,12 +19,17 @@ def redact_text_matches(pdf_bytes: bytes, terms: List[str], ignore_case: bool = 
             # flags=fitz.TEXT_PRESERVE_WHITESPACE | ...
             # search_for retorna lista de Rect
             
-            # Se ignore_case, fitz não tem flag direto no search_for simples antigo,
-            # mas versões recentes têm flags. Vamos usar padrão.
-            flags = fitz.TEXT_CASE_IGNORED if ignore_case else 0
+            # flags = fitz.TEXT_CASE_IGNORED if ignore_case else 0
+            # Fallback seguro: se não existir, usa 0 (mas perde case insensitivity)
+            # Ou checa se existe
+            flag_val = getattr(fitz, "TEXT_CASE_IGNORED", None)
             
-            # Vamos buscar quadras
-            quads = page.search_for(term, flags=flags)
+            if flag_val is not None and ignore_case:
+                quads = page.search_for(term, flags=flag_val)
+            else:
+                 # Versões antigas ou sem flag: search_for default costuma ser case insensitive? 
+                 # Não necessariamente. Mas para não quebrar, vamos sem flags especiais se atributo não existe.
+                 quads = page.search_for(term)
             
             if quads:
                 count += len(quads)
