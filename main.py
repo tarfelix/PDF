@@ -163,7 +163,7 @@ if "Comparar Versões" in tab_map:
 if st.session_state.get('is_single_pdf_mode') and doc_cached:
     if "Peças Jurídicas" in tab_map:
         with tab_map["Peças Jurídicas"]:
-            legal.render(doc_cached, st.session_state.pdf_name, st.session_state.bookmarks_data)
+            legal.render(doc_cached, st.session_state.pdf_name, st.session_state.bookmarks_data, st.session_state.pdf_doc_bytes_original)
 
     if "Numeração (Bates)" in tab_map:
         with tab_map["Numeração (Bates)"]:

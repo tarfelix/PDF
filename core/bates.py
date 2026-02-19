@@ -59,7 +59,7 @@ def apply_bates_stamping(
             rect_insert,
             current_text,
             fontsize=font_size,
-            fontname="tiro", # Times Roman standard (serif)
+            fontname="helv", # Helvetica (sempre disponível no PyMuPDF)
             color=color,
             align=align
         )

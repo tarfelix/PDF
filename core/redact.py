@@ -27,9 +27,8 @@ def redact_text_matches(pdf_bytes: bytes, terms: List[str], ignore_case: bool = 
             if flag_val is not None and ignore_case:
                 quads = page.search_for(term, flags=flag_val)
             else:
-                 # Versões antigas ou sem flag: search_for default costuma ser case insensitive? 
-                 # Não necessariamente. Mas para não quebrar, vamos sem flags especiais se atributo não existe.
-                 quads = page.search_for(term)
+                # Versões sem suporte ao flag — busca padrão
+                quads = page.search_for(term)
             
             if quads:
                 count += len(quads)

@@ -8,7 +8,7 @@ from core.pdf_scanner import smart_scan
 from config import ENCRYPT_AES_256, PERM_PRINT, PERM_COPY, PERM_ANNOTATE
 from core.utils import safe_slug
 
-def render(doc_cached: fitz.Document, pdf_name: str, bookmarks_unused=None):
+def render(doc_cached: fitz.Document, pdf_name: str, bookmarks_unused=None, pdf_bytes_original: bytes = None):
     st.header("⚖️ Identificador de Peças (Smart Scan)")
     st.caption("Localiza peças jurídicas usando marcadores ou inteligência de texto (para PDFs digitalizados).")
     
@@ -94,18 +94,11 @@ def render(doc_cached: fitz.Document, pdf_name: str, bookmarks_unused=None):
     if st.button("🚀 Processar e Baixar", type="primary", disabled=len(edited_items)==0):
         try:
             with st.spinner("Extraindo e processando..."):
-                final_files = [] # List dest tuples (filename, bytes)
+                final_files = []
                 
-                # Abre PDF original bytes
-                # Recomenda-se usar fitz.Document na memoria RAM se nao for gigante, 
-                # ou reabrir do disco se fosse file path. Aqui é bytes.
-                src_doc = fitz.open(stream=doc_cached.stream, filetype="pdf") 
-                # doc_cached.stream pode ser None se foi aberto via filename, mas aqui main passa bytes no init
-                # Melhor usar os bytes originais passados na main se possivel, mas aqui so recebemos doc_cached
-                # doc_cached.name é o filename?
-                # Vamos reusar o doc_cached para copy? Não, thread safety.
-                # O ideal seria receber `pdf_bytes` no render.
-                # Mas `src_doc` criado acima a partir de stream deve funcionar.
+                # Usa bytes originais para abrir o documento fonte (mais seguro)
+                raw_bytes = pdf_bytes_original or st.session_state.get('pdf_doc_bytes_original')
+                src_doc = fitz.open(stream=raw_bytes, filetype="pdf")
                 
                 for item in edited_items:
                     # Extrai intervalo
@@ -143,7 +136,7 @@ def render(doc_cached: fitz.Document, pdf_name: str, bookmarks_unused=None):
                             zf.writestr(fname, b)
                             d.close()
                     output_bytes = zb.getvalue()
-                    out_name = f"{os.path.splitext(pdf_name)[0]}_pecas.zip"
+                    out_name = f"{os.path.splitext(pdf_name)[0]}{filename_suffix}.zip"
                     
                 src_doc.close()
                 
