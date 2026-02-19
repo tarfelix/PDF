@@ -1,10 +1,10 @@
 {
     "python.analysis.extraPaths": [
-        "./"
+        "c:\\Users\\TarcisioPicon\\source\\repos\\PDF"
     ],
     "python.autoComplete.extraPaths": [
-        "./"
+        "c:\\Users\\TarcisioPicon\\source\\repos\\PDF"
     ],
-    "python.defaultInterpreterPath": "${workspaceFolder}/.venv/Scripts/python.exe",
-    "python.analysis.typeCheckingMode": "basic"
+    "python.defaultInterpreterPath": "c:\\Users\\TarcisioPicon\\source\\repos\\PDF\\.venv\\Scripts\\python.exe",
+    "python.analysis.typeCheckingMode": "off"
 }
