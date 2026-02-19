@@ -79,8 +79,8 @@ def render(doc_cached: fitz.Document, pdf_name: str, bookmarks_unused=None):
             if is_checked:
                 edited_items.append(items[i])
                 
-            # Origem tooltip
-            c_source.help(f"Fonte: {item.get('source', 'desconhecida')}")
+            # Origem
+            c_source.caption(f"{item.get('source', 'unk')}")
             
     st.write(f"**{len(edited_items)}** peças selecionadas para extração.")
     
