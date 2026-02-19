@@ -132,7 +132,8 @@ if st.session_state.get('is_single_pdf_mode', False):
 tabs.append("Mesclar")
 
 tab_objs = st.tabs(tabs)
-tab_map = {name: tab for name, tab in zip(tabs, tab_objs)}
+from typing import Dict, Any
+tab_map: Dict[str, Any] = {name: tab for name, tab in zip(tabs, tab_objs)}
 
 # --- Carregamento do Documento (Cache) ---
 doc_cached = None
