@@ -1,0 +1,61 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+@import "tailwindcss";
+
+@theme {
+  /* Brand colors - Soares, Picon identity */
+  --color-brand-900: #022340;
+  --color-brand-800: #025791;
+  --color-brand-700: #0A6DB5;
+  --color-brand-600: #1A7CC5;
+  --color-brand-500: #2E8BD4;
+  --color-brand-400: #5BA8D9;
+  --color-brand-300: #89C3E8;
+  --color-brand-200: #A8D4F0;
+  --color-brand-100: #D4EAFA;
+  --color-brand-50: #EAF4FC;
+
+  /* Semantic */
+  --color-primary: #025791;
+  --color-primary-light: #1A7CC5;
+  --color-accent: #5BA8D9;
+  --color-success: #10b981;
+  --color-warning: #f59e0b;
+  --color-error: #ef4444;
+
+  /* Surfaces */
+  --color-bg-primary: #f0f4f8;
+  --color-bg-card: #ffffff;
+  --color-bg-elevated: #ffffff;
+  --color-bg-hover: #e8f0fa;
+
+  /* Text */
+  --color-text-primary: #003761;
+  --color-text-secondary: #2d5a7b;
+  --color-text-muted: #5c7d99;
+
+  /* Radii */
+  --radius-sm: 0.375rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+  --radius-xl: 1rem;
+}
+
+body {
+  font-family: "Inter", system-ui, -apple-system, sans-serif;
+  background-color: var(--color-bg-primary);
+  color: var(--color-text-primary);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--color-brand-300); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--color-brand-400); }
+
+/* Focus ring */
+*:focus-visible {
+  outline: 2px solid var(--color-brand-400);
+  outline-offset: 2px;
+}

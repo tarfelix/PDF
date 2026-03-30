@@ -1,0 +1,14 @@
+services:
+  app:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - CORS_ORIGINS=*
+      - TEMP_FILE_TTL_MINUTES=30
+    volumes:
+      - pdf-temp:/tmp/pdf-editor
+    restart: unless-stopped
+
+volumes:
+  pdf-temp:
