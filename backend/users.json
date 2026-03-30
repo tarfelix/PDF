@@ -1,0 +1,254 @@
+{
+  "ana.neto@soarespicon.adv.br": {
+    "name": "Ana Neto",
+    "email": "ana.neto@soarespicon.adv.br",
+    "role": "Administrador",
+    "password_hash": "$2b$12$djR1F8Sls56Ht8rQnXlzIu/8OcON8tQFHKlzjr7Jel0mVR2eVRlka"
+  },
+  "ana.rocha@soarespicon.adv.br": {
+    "name": "Ana Rocha",
+    "email": "ana.rocha@soarespicon.adv.br",
+    "role": "Administrador",
+    "password_hash": "$2b$12$ctFnw8DKMKIRNFJW5tCsqeo5UvwdA9ArO3z3zSZLTsSWfIXGImKQ2"
+  },
+  "andressa.gessner@soarespicon.adv.br": {
+    "name": "Andressa Gessner",
+    "email": "andressa.gessner@soarespicon.adv.br",
+    "role": "Advogado",
+    "password_hash": "$2b$12$aqiPvzO1vnOcCcDZiVBPQ.kre0cAQg6owgBgjlhBirh2W2Z2uTKYu"
+  },
+  "auriesley.almeida@soarespicon.adv.br": {
+    "name": "Auriesley Almeida",
+    "email": "auriesley.almeida@soarespicon.adv.br",
+    "role": "Advogado",
+    "password_hash": "$2b$12$JIdHsDfYHIFw.qxUiyLQ5u4QKKPMnzvFl/eabX708RKCIK8j0B7qi"
+  },
+  "bianca.sana@soarespicon.adv.br": {
+    "name": "Bianca Sana",
+    "email": "bianca.sana@soarespicon.adv.br",
+    "role": "Administrador",
+    "password_hash": "$2b$12$voSAuvKRgy46sYbWVczQy.kwDtG7uQOR6X1K5ClcHOlezPNNM.BEu"
+  },
+  "carolina.franco@soarespicon.adv.br": {
+    "name": "Carolina Franco",
+    "email": "carolina.franco@soarespicon.adv.br",
+    "role": "Super Advogado",
+    "password_hash": "$2b$12$NFabrc/QikfAacPjKpf/I.Gw.Abi3AEov4N1WhoX9FbnApBElDHqa"
+  },
+  "cristiane.souza@soarespicon.adv.br": {
+    "name": "Cristiane Souza",
+    "email": "cristiane.souza@soarespicon.adv.br",
+    "role": "Advogado",
+    "password_hash": "$2b$12$J2XkBc3KC/OrztsdhC.w5.IMP3l3F69m3kciwYxRXUL4reNsUcVH2"
+  },
+  "daniel.melo@soarespicon.adv.br": {
+    "name": "Daniel Melo",
+    "email": "daniel.melo@soarespicon.adv.br",
+    "role": "Advogado",
+    "password_hash": "$2b$12$ySLwcENL.tJiD/lOPHh5.eCEBbZ7OX.kWKerSs/eRJsnIvGeiC5o6"
+  },
+  "daniela.oliveira@soarespicon.adv.br": {
+    "name": "Daniela Oliveira",
+    "email": "daniela.oliveira@soarespicon.adv.br",
+    "role": "Advogado",
+    "password_hash": "$2b$12$s968sVGGLeNqLmKStMlmqu2bGejvGpoJxtIq3Ev6Kj3YUnb1cRGfu"
+  },
+  "douglas.oliveira@soarespicon.adv.br": {
+    "name": "Douglas Oliveira",
+    "email": "douglas.oliveira@soarespicon.adv.br",
+    "role": "Advogado",
+    "password_hash": "$2b$12$5LLGqpA9cU0rZd3eIwDMY.6PSQgSsv3DMtMLoEm0fGXqzpO.0PM52"
+  },
+  "elaine.dias@soarespicon.adv.br": {
+    "name": "Elaine Dias",
+    "email": "elaine.dias@soarespicon.adv.br",
+    "role": "Advogado",
+    "password_hash": "$2b$12$FQQnTyRFbLRiHmWkJKCPd.RTaKyzbf2pD3f2My6/LElDfCprCaGdK"
+  },
+  "erica.ribeiro@soarespicon.adv.br": {
+    "name": "Erica Ribeiro",
+    "email": "erica.ribeiro@soarespicon.adv.br",
+    "role": "Advogado",
+    "password_hash": "$2b$12$X2scIkWqRo9cvg3zELb0nOoJNPWIo.wfesGp/kcO.H2G6Cs9oGcbq"
+  },
+  "evelyn.bucovic@soarespicon.adv.br": {
+    "name": "Evelyn Bucovic",
+    "email": "evelyn.bucovic@soarespicon.adv.br",
+    "role": "Administrador",
+    "password_hash": "$2b$12$hZoAaXIWSErPPdPA5yfku.0WDYTMMTgHWrc/XlUm5oWR2xgIYRb5y"
+  },
+  "fabiana.gois@soarespicon.adv.br": {
+    "name": "Fabiana Gois",
+    "email": "fabiana.gois@soarespicon.adv.br",
+    "role": "Administrador",
+    "password_hash": "$2b$12$Q28hiwYLdYHdq7RnvU.kQOTsxzRHm2dccM/A92tuqMbiWKN./xuuW"
+  },
+  "fernanda.darc@soarespicon.adv.br": {
+    "name": "Fernanda Darc",
+    "email": "fernanda.darc@soarespicon.adv.br",
+    "role": "Advogado",
+    "password_hash": "$2b$12$jQbI4UUvbbHKQr9ZMAWYgexmFeQhk2e6Wu69CiUoAN619114sQNt."
+  },
+  "filipe.carvalho@soarespicon.adv.br": {
+    "name": "Filipe Carvalho",
+    "email": "filipe.carvalho@soarespicon.adv.br",
+    "role": "Advogado",
+    "password_hash": "$2b$12$3cLgH28gzxJJsQeqVtbE3ef4g6uZjCtaY2H2Erv/qFo/G3Sa9w9Cm"
+  },
+  "gabriel.mota@soarespicon.adv.br": {
+    "name": "Gabriel Mota",
+    "email": "gabriel.mota@soarespicon.adv.br",
+    "role": "Advogado",
+    "password_hash": "$2b$12$GzEe560lbHGLfo9uqH4gD./.MkjjQ4reVxWwoMQUNGyqJ37x4AVBS"
+  },
+  "gabriel.oliveira@soarespicon.adv.br": {
+    "name": "Gabriel Oliveira",
+    "email": "gabriel.oliveira@soarespicon.adv.br",
+    "role": "Advogado",
+    "password_hash": "$2b$12$P79opO2eARyB4jnPgZaMA.fBDPrX29JJb.IF9Grz8xgY3wOjqEOwW"
+  },
+  "gabrielle.almeida@soarespicon.adv.br": {
+    "name": "Gabrielle Almeida",
+    "email": "gabrielle.almeida@soarespicon.adv.br",
+    "role": "Administrador",
+    "password_hash": "$2b$12$f47OV2HAMXUJU/hHCv25D.Ia0v0mMQk7tRWEUewH19XaNAv9RTqxK"
+  },
+  "gabriela.stetner@soarespicon.adv.br": {
+    "name": "Gabriela Stetner",
+    "email": "gabriela.stetner@soarespicon.adv.br",
+    "role": "Advogado",
+    "password_hash": "$2b$12$bjPCzs18ThTouTHSkiXruuU5lP61y4KrbNKNduOJYhh3wrJjzzD1y"
+  },
+  "gisele.oliveira@soarespicon.adv.br": {
+    "name": "Gisele Oliveira",
+    "email": "gisele.oliveira@soarespicon.adv.br",
+    "role": "Advogado",
+    "password_hash": "$2b$12$1HGQA1cT35esDJDBJcKULOgvJae/TiFpfDMQaZngbkafOtsEyVO5i"
+  },
+  "inna.diacov@soarespicon.adv.br": {
+    "name": "Inna Diacov",
+    "email": "inna.diacov@soarespicon.adv.br",
+    "role": "Advogado",
+    "password_hash": "$2b$12$bDfCSMwqZ25ShZHChsIGbemTC7ulZL9MYJ8gZ1h7fHdNyjJP3X3Xi"
+  },
+  "isabella.awoyama@soarespicon.adv.br": {
+    "name": "Isabella Awoyama",
+    "email": "isabella.awoyama@soarespicon.adv.br",
+    "role": "Administrador",
+    "password_hash": "$2b$12$yRFNta2O7haSy7Q1U5q8.eP3RV4vlo2b.sY5XFz0kP5f4ZgfMkrQu"
+  },
+  "isabella.reis@soarespicon.adv.br": {
+    "name": "Isabella Reis",
+    "email": "isabella.reis@soarespicon.adv.br",
+    "role": "Advogado",
+    "password_hash": "$2b$12$lCmxZQCPjPKsABKN49HpCOqppKm1iWHd39By1na7c8lvdWB11fNQ6"
+  },
+  "louise.fonseca@soarespicon.adv.br": {
+    "name": "Louise Fonseca",
+    "email": "louise.fonseca@soarespicon.adv.br",
+    "role": "Advogado",
+    "password_hash": "$2b$12$04QxfK1kdDZQst6yOBpwmuTnM7kuuKCOFIuI3B3WDTVHrflrTv0ju"
+  },
+  "luiz.marques@soarespicon.adv.br": {
+    "name": "Luiz Marques",
+    "email": "luiz.marques@soarespicon.adv.br",
+    "role": "Advogado",
+    "password_hash": "$2b$12$N1gBwj7Jf1wm1sIVCDD0SeV4xNgpFVe7iUd2C4mcmGIM7xG5JUal."
+  },
+  "luiza.guirau@soarespicon.adv.br": {
+    "name": "Luiza Guirau",
+    "email": "luiza.guirau@soarespicon.adv.br",
+    "role": "Administrador",
+    "password_hash": "$2b$12$iegiU/buTBYqvih74wg7N.2WLCWYLU7cHXeUvwRbFrrR62N7SXizW"
+  },
+  "maria.moraes@soarespicon.adv.br": {
+    "name": "Maria Moraes",
+    "email": "maria.moraes@soarespicon.adv.br",
+    "role": "Administrador",
+    "password_hash": "$2b$12$RDZ/v2RCkJzIlhFsjg/i0u60inuD94eutNRweMO5yXlP4rV7vuGKa"
+  },
+  "mariana.santos@soarespicon.adv.br": {
+    "name": "Mariana Santos",
+    "email": "mariana.santos@soarespicon.adv.br",
+    "role": "Administrador",
+    "password_hash": "$2b$12$s5XQMuPqP205/awkdmlxJuP3KBartc..Gwsu6Rh89Cwt2Gu/5O/jy"
+  },
+  "maysa.kallas@soarespicon.adv.br": {
+    "name": "Maysa Kallas",
+    "email": "maysa.kallas@soarespicon.adv.br",
+    "role": "Advogado",
+    "password_hash": "$2b$12$wO0KPZXsE1ggy8tG53lOv.PGE.FTXyxPxgO2JK4mfPtXdvqA5NvbS"
+  },
+  "milena.carreira@soarespicon.adv.br": {
+    "name": "Milena Carreira",
+    "email": "milena.carreira@soarespicon.adv.br",
+    "role": "Super Advogado",
+    "password_hash": "$2b$12$2yuB.WR1BpMVm7uw./vvNeRWkhNdNb2bMefxJ1LJOESPFt0785P2C"
+  },
+  "naara.carvalho@soarespicon.adv.br": {
+    "name": "Naara Carvalho",
+    "email": "naara.carvalho@soarespicon.adv.br",
+    "role": "Advogado",
+    "password_hash": "$2b$12$gJagy3aguVNSWvy5WMfVN.f7NGsXn39QlIJL3PpIqOIK1BF0PbRB6"
+  },
+  "pedro.fontoura@soarespicon.adv.br": {
+    "name": "Pedro Fontoura",
+    "email": "pedro.fontoura@soarespicon.adv.br",
+    "role": "Advogado",
+    "password_hash": "$2b$12$1ragr5NSGIPGPIZPTq5T6O5IgUqYpUrRSvQrYspoQSSww2cNXPwZ6"
+  },
+  "picon.soares@soarespicon.adv.br": {
+    "name": "Picon Soares",
+    "email": "picon.soares@soarespicon.adv.br",
+    "role": "Administrador",
+    "password_hash": "$2b$12$chVWqi6jGaoy/Uuq4wpqWOinDKwrfeU1SW3K0RmE40BZjtbZibD7W"
+  },
+  "ruth.cibils@soarespicon.adv.br": {
+    "name": "Ruth Cibils",
+    "email": "ruth.cibils@soarespicon.adv.br",
+    "role": "Advogado",
+    "password_hash": "$2b$12$xHcIga0mGUqN4EQIEfzOOOhY7B.7vEpcTIqfZ6ROS9OP1I9XVNxBa"
+  },
+  "sofia.fares@soarespicon.adv.br": {
+    "name": "Sofia Fares",
+    "email": "sofia.fares@soarespicon.adv.br",
+    "role": "Administrador",
+    "password_hash": "$2b$12$mPpoA3.VeGT4Xq/RJ0Xm8OXBeKHsCCwnW3zjtmIwpGftMq.1fYlNy"
+  },
+  "taisadlopes@soarespicon.adv.br": {
+    "name": "Taisadlopes",
+    "email": "taisadlopes@soarespicon.adv.br",
+    "role": "Advogado",
+    "password_hash": "$2b$12$lyWS/ACwHvWr6z49Ngk.0u/3um9Tu3GEw1g7F7ceLuEK/1F8/.JGy"
+  },
+  "tarcisio.picon@soarespicon.adv.br": {
+    "name": "Tarcisio Picon",
+    "email": "tarcisio.picon@soarespicon.adv.br",
+    "role": "Administrador",
+    "password_hash": "$2b$12$ifXTmuSd5ZUQWwUx0HYHweX4nlQVPteJljkmSfab7rF5OrQPxbJeC"
+  },
+  "tarcisio.soares@soarespicon.adv.br": {
+    "name": "Tarcisio Soares",
+    "email": "tarcisio.soares@soarespicon.adv.br",
+    "role": "Administrador",
+    "password_hash": "$2b$12$8IrSStp38gSL0ezkVQkt9OYiWuX/6ImVti/u.5qJ0H2lgMfq8g0AS"
+  },
+  "tatiane.oliveira@soarespicon.adv.br": {
+    "name": "Tatiane Oliveira",
+    "email": "tatiane.oliveira@soarespicon.adv.br",
+    "role": "Advogado",
+    "password_hash": "$2b$12$9QCyGMHSucqRPeNgZ6iPpuVdagAYKfE2Ien1sU1GFhlJq2INpHCJC"
+  },
+  "vivian.vieira@soarespicon.adv.br": {
+    "name": "Vivian Vieira",
+    "email": "vivian.vieira@soarespicon.adv.br",
+    "role": "Administrativo",
+    "password_hash": "$2b$12$42tAzXfFctDpqhGhA/WwZuGyjsUpKUYor2kiHnWipMTEPtWMN0Yxi"
+  },
+  "yuri.toledo@soarespicon.adv.br": {
+    "name": "Yuri Toledo",
+    "email": "yuri.toledo@soarespicon.adv.br",
+    "role": "Advogado",
+    "password_hash": "$2b$12$PzLMMQ1KBNxbWOxHZflqVOAzyZ9NgWRUDhuTxb2JZ/KzV.cU3oX9S"
+  }
+}

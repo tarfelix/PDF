@@ -3,7 +3,9 @@ import { Header } from "@/components/layout/Header";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { FileUpload } from "@/components/layout/FileUpload";
 import { Onboarding } from "@/components/onboarding/Onboarding";
+import { LoginPage } from "@/components/auth/LoginPage";
 import { usePdfStore } from "@/stores/pdf-store";
+import { useAuthStore } from "@/stores/auth-store";
 import { HelpCircle } from "lucide-react";
 
 import { LegalScanTool } from "@/components/tools/LegalScanTool";
@@ -36,6 +38,7 @@ const ONBOARDING_KEY = "pdf-editor-onboarding-done";
 
 export default function App() {
   const { activeTool } = usePdfStore();
+  const { token } = useAuthStore();
   const ActiveComponent = TOOL_COMPONENTS[activeTool];
 
   const [showOnboarding, setShowOnboarding] = useState(() => {
@@ -50,6 +53,10 @@ export default function App() {
   const reopenOnboarding = () => {
     setShowOnboarding(true);
   };
+
+  if (!token) {
+    return <LoginPage />;
+  }
 
   return (
     <div className="h-screen flex flex-col bg-[#f0f4f8]">
