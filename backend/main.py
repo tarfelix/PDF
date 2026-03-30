@@ -38,6 +38,7 @@ app.add_middleware(
 )
 
 # --- API Routes ---
+from api.auth import router as auth_router
 from api.files import router as files_router
 from api.merge import router as merge_router
 from api.split import router as split_router
@@ -52,6 +53,7 @@ from api.diff import router as diff_router
 from api.converter import router as converter_router
 from api.thumbnails import router as thumbnails_router
 
+app.include_router(auth_router, prefix="/api")
 app.include_router(files_router, prefix="/api")
 app.include_router(merge_router, prefix="/api")
 app.include_router(split_router, prefix="/api")
