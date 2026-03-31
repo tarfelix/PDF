@@ -3,8 +3,9 @@ import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from config import settings, DEFAULT_BRAND
@@ -36,6 +37,12 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    logger.error(f"Unhandled exception on {request.url}: {exc}", exc_info=True)
+    return JSONResponse(status_code=500, content={"detail": str(exc)})
 
 # --- API Routes ---
 from api.auth import router as auth_router

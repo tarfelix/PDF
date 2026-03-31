@@ -7,7 +7,7 @@ services:
       - CORS_ORIGINS=*
       - TEMP_FILE_TTL_MINUTES=30
     volumes:
-      - pdf-temp:/tmp/pdf-editor
+      - pdf-temp:/app/tmp
     restart: unless-stopped
 
 volumes:

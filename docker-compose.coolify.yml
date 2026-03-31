@@ -6,15 +6,15 @@ services:
     cpus: 2
     environment:
       - CORS_ORIGINS=${CORS_ORIGINS:-*}
-      - TEMP_FILE_TTL_MINUTES=${TEMP_FILE_TTL_MINUTES:-30}
-      - MAX_UPLOAD_SIZE_MB=${MAX_UPLOAD_SIZE_MB:-200}
+      - TEMP_FILE_TTL_MINUTES=${TEMP_FILE_TTL_MINUTES:-60}
+      - MAX_UPLOAD_SIZE_MB=${MAX_UPLOAD_SIZE_MB:-500}
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')"]
       interval: 30s
       timeout: 10s
       retries: 3
     volumes:
-      - pdf-temp:/tmp/pdf-editor
+      - pdf-temp:/app/tmp
     networks:
       - coolify
 

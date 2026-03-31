@@ -1,3 +1,4 @@
+import logging
 import fitz
 from fastapi import APIRouter, UploadFile, File, HTTPException
 from fastapi.responses import Response
@@ -5,6 +6,7 @@ from typing import List
 
 from services.file_manager import file_manager
 
+logger = logging.getLogger(__name__)
 router = APIRouter(tags=["files"])
 
 
@@ -12,33 +14,38 @@ router = APIRouter(tags=["files"])
 async def upload_files(files: List[UploadFile] = File(...)):
     """Upload one or more files. Returns file_id and metadata for each."""
     results = []
-    for f in files:
-        data = await f.read()
-        content_type = f.content_type or "application/octet-stream"
-        file_id = file_manager.store(data, f.filename or "upload", content_type)
+    try:
+        for f in files:
+            data = await f.read()
+            content_type = f.content_type or "application/octet-stream"
+            file_id = file_manager.store(data, f.filename or "upload", content_type)
 
-        meta = {"file_id": file_id, "filename": f.filename, "size_bytes": len(data)}
+            meta = {"file_id": file_id, "filename": f.filename, "size_bytes": len(data)}
 
-        if content_type == "application/pdf" or (f.filename and f.filename.lower().endswith(".pdf")):
-            try:
-                doc = fitz.open(stream=data, filetype="pdf")
-                toc = doc.get_toc(simple=False)
-                bookmarks = []
-                for i, item in enumerate(toc):
-                    lvl, title, page1 = item[0], item[1], item[2]
-                    bookmarks.append({
-                        "level": lvl,
-                        "title": title,
-                        "page": page1,
-                    })
-                meta["pages"] = doc.page_count
-                meta["bookmarks"] = bookmarks
-                doc.close()
-            except Exception:
-                meta["pages"] = 0
-                meta["bookmarks"] = []
+            if content_type == "application/pdf" or (f.filename and f.filename.lower().endswith(".pdf")):
+                try:
+                    doc = fitz.open(stream=data, filetype="pdf")
+                    toc = doc.get_toc(simple=False)
+                    bookmarks = []
+                    for i, item in enumerate(toc):
+                        lvl, title, page1 = item[0], item[1], item[2]
+                        bookmarks.append({
+                            "level": lvl,
+                            "title": title,
+                            "page": page1,
+                        })
+                    meta["pages"] = doc.page_count
+                    meta["bookmarks"] = bookmarks
+                    doc.close()
+                except Exception:
+                    meta["pages"] = 0
+                    meta["bookmarks"] = []
 
-        results.append(meta)
+            results.append(meta)
+
+    except Exception as e:
+        logger.error(f"Upload error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Erro no upload: {str(e)}")
 
     return results
 

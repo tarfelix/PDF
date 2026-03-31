@@ -10,7 +10,7 @@ from config import settings
 
 logger = logging.getLogger(__name__)
 
-TEMP_DIR = Path(os.environ.get("TEMP_DIR", "/tmp/pdf-editor"))
+TEMP_DIR = Path(os.environ.get("TEMP_DIR", "/app/tmp"))
 TEMP_DIR.mkdir(parents=True, exist_ok=True)
 
 
