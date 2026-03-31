@@ -1,8 +1,8 @@
 services:
   app:
     build: .
-    ports:
-      - "8000:8000"
+    expose:
+      - "8000"
     environment:
       - CORS_ORIGINS=*
       - TEMP_FILE_TTL_MINUTES=30
