@@ -1,12 +1,10 @@
-import io
-import zipfile
 import asyncio
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import List, Optional
 
 from services.file_manager import file_manager
-from core.pdf_ops import extract_pages
+from core.pdf_ops import extract_pages, merge_pdfs
 from core.utils import parse_page_input
 
 router = APIRouter(tags=["extract"])
@@ -31,25 +29,23 @@ async def extract(req: ExtractRequest):
     info = file_manager.get_info(req.file_id)
     base_name = info["filename"].rsplit(".", 1)[0] if info else "extraido"
 
-    # Extract multiple named segments (legal pieces)
+    # Extract multiple named segments (legal pieces) → single merged PDF
     if req.segments:
-        zip_buffer = io.BytesIO()
-        with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
-            for seg in req.segments:
-                pages = list(range(seg["start"], seg["end"] + 1))
-                part_bytes = await asyncio.to_thread(
-                    extract_pages, data, pages, req.optimize, req.password
-                )
-                name = seg.get("name", f"paginas_{seg['start']+1}-{seg['end']+1}")
-                zf.writestr(f"{name}.pdf", part_bytes)
+        parts = []
+        for seg in req.segments:
+            pages = list(range(seg["start"], seg["end"] + 1))
+            part_bytes = await asyncio.to_thread(
+                extract_pages, data, pages, req.optimize, req.password
+            )
+            parts.append(part_bytes)
 
-        zip_bytes = zip_buffer.getvalue()
-        result_id = file_manager.store(zip_bytes, f"{base_name}_pecas.zip", "application/zip")
+        merged_bytes = await asyncio.to_thread(merge_pdfs, parts, req.optimize)
+        result_id = file_manager.store(merged_bytes, f"{base_name}_pecas.pdf", "application/pdf")
         return {
             "result_file_id": result_id,
-            "filename": f"{base_name}_pecas.zip",
+            "filename": f"{base_name}_pecas.pdf",
             "segments": len(req.segments),
-            "size_bytes": len(zip_bytes),
+            "size_bytes": len(merged_bytes),
         }
 
     # Resolve page indices
