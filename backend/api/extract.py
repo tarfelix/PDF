@@ -1,12 +1,12 @@
 import io
-import zipfile
 import asyncio
+import fitz
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import List, Optional
 
 from services.file_manager import file_manager
-from core.pdf_ops import extract_pages
+from core.pdf_ops import extract_pages, optimize_pdf
 from core.utils import parse_page_input
 
 router = APIRouter(tags=["extract"])
@@ -31,30 +31,34 @@ async def extract(req: ExtractRequest):
     info = file_manager.get_info(req.file_id)
     base_name = info["filename"].rsplit(".", 1)[0] if info else "extraido"
 
-    # Extract multiple named segments (legal pieces)
+    # Extract multiple named segments (legal pieces) → single merged PDF
     if req.segments:
-        zip_buffer = io.BytesIO()
-        with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
-            for seg in req.segments:
-                pages = list(range(seg["start"], seg["end"] + 1))
-                part_bytes = await asyncio.to_thread(
-                    extract_pages, data, pages, req.optimize, req.password
-                )
-                name = seg.get("name", f"paginas_{seg['start']+1}-{seg['end']+1}")
-                zf.writestr(f"{name}.pdf", part_bytes)
+        sorted_segs = sorted(req.segments, key=lambda s: s["start"])
+        src_doc = fitz.open(stream=data, filetype="pdf")
+        out_doc = fitz.open()
+        toc = []
+        current_page = 0
 
-        zip_bytes = zip_buffer.getvalue()
-        result_id = file_manager.store(zip_bytes, f"{base_name}_pecas.zip", "application/zip")
+        for seg in sorted_segs:
+            name = seg.get("name", f"Páginas {seg['start']+1}-{seg['end']+1}")
+            out_doc.insert_pdf(src_doc, from_page=seg["start"], to_page=seg["end"])
+            toc.append([1, name, current_page + 1])
+            current_page += seg["end"] - seg["start"] + 1
+
+        out_doc.set_toc(toc)
+        opts = {"deflate_images": req.optimize, "deflate_fonts": req.optimize}
+        merged_bytes = await asyncio.to_thread(optimize_pdf, out_doc, opts)
+
+        result_id = file_manager.store(merged_bytes, f"{base_name}_pecas.pdf")
         return {
             "result_file_id": result_id,
-            "filename": f"{base_name}_pecas.zip",
+            "filename": f"{base_name}_pecas.pdf",
             "segments": len(req.segments),
-            "size_bytes": len(zip_bytes),
+            "size_bytes": len(merged_bytes),
         }
 
     # Resolve page indices
     if req.pages:
-        import fitz
         doc = fitz.open(stream=data, filetype="pdf")
         page_indices = parse_page_input(req.pages, doc.page_count)
         doc.close()
