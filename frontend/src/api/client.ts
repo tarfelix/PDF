@@ -1,10 +1,13 @@
 const BASE = "/api";
 
-// SSO central: sessao no cookie (mesma origem). Em 401 a sessao expirou ->
-// recarrega; o edge (oauth2-proxy) redireciona pro login M365.
+// SSO central (oauth2-proxy auth-request-only): em 401 a sessao nao existe/expirou.
+// O edge so injeta headers em /api; aqui mandamos o browser pro /oauth2/start,
+// que faz 302 -> M365 e volta (rd) ja autenticado.
+const SSO_START = "https://auth.soarespicon.adv.br/oauth2/start";
+
 function handleUnauthorized(): never {
-  window.location.reload();
-  throw new Error("Sessão expirada — redirecionando para o login");
+  window.location.href = `${SSO_START}?rd=${encodeURIComponent(window.location.href)}`;
+  throw new Error("Redirecionando para o login (SSO)");
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {

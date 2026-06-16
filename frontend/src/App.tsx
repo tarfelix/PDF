@@ -71,17 +71,22 @@ export default function App() {
   }
 
   if (!user) {
+    const ssoLogin = () => {
+      window.location.href =
+        "https://auth.soarespicon.adv.br/oauth2/start?rd=" +
+        encodeURIComponent(window.location.href);
+    };
     return (
       <div className="h-screen flex flex-col items-center justify-center bg-[#f0f4f8] text-center px-6">
         <p className="text-[#022340] font-semibold">Sessão não autenticada</p>
         <p className="text-sm text-slate-500 mt-1">
-          Recarregue a página para entrar via SSO (Microsoft 365).
+          Entre via SSO (Microsoft 365) para usar o Editor de PDF.
         </p>
         <button
-          onClick={() => window.location.reload()}
+          onClick={ssoLogin}
           className="mt-4 px-4 py-2 text-sm rounded-md bg-[#025791] text-white hover:bg-[#022340]"
         >
-          Entrar
+          Entrar com Microsoft 365
         </button>
       </div>
     );
