@@ -3,11 +3,12 @@ import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI, Request
+from fastapi import Depends, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
+from auth import get_current_user
 from config import settings, DEFAULT_BRAND
 from services.file_manager import file_manager
 
@@ -60,20 +61,25 @@ from api.diff import router as diff_router
 from api.converter import router as converter_router
 from api.thumbnails import router as thumbnails_router
 
+# auth_router (/me) tem dep proprio; health/brand ficam publicos (healthcheck Coolify).
+# Hardening: todo router de ferramenta exige usuario autenticado (defense-in-depth,
+# alem do forwardauth no edge). X-Auth-Request-* injetado pelo oauth2-proxy.
+_auth = [Depends(get_current_user)]
+
 app.include_router(auth_router, prefix="/api")
-app.include_router(files_router, prefix="/api")
-app.include_router(merge_router, prefix="/api")
-app.include_router(split_router, prefix="/api")
-app.include_router(extract_router, prefix="/api")
-app.include_router(remove_router, prefix="/api")
-app.include_router(rotate_router, prefix="/api")
-app.include_router(optimize_router, prefix="/api")
-app.include_router(bates_router, prefix="/api")
-app.include_router(redact_router, prefix="/api")
-app.include_router(scan_router, prefix="/api")
-app.include_router(diff_router, prefix="/api")
-app.include_router(converter_router, prefix="/api")
-app.include_router(thumbnails_router, prefix="/api")
+app.include_router(files_router, prefix="/api", dependencies=_auth)
+app.include_router(merge_router, prefix="/api", dependencies=_auth)
+app.include_router(split_router, prefix="/api", dependencies=_auth)
+app.include_router(extract_router, prefix="/api", dependencies=_auth)
+app.include_router(remove_router, prefix="/api", dependencies=_auth)
+app.include_router(rotate_router, prefix="/api", dependencies=_auth)
+app.include_router(optimize_router, prefix="/api", dependencies=_auth)
+app.include_router(bates_router, prefix="/api", dependencies=_auth)
+app.include_router(redact_router, prefix="/api", dependencies=_auth)
+app.include_router(scan_router, prefix="/api", dependencies=_auth)
+app.include_router(diff_router, prefix="/api", dependencies=_auth)
+app.include_router(converter_router, prefix="/api", dependencies=_auth)
+app.include_router(thumbnails_router, prefix="/api", dependencies=_auth)
 
 
 @app.get("/api/health")

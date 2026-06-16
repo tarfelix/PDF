@@ -4,7 +4,12 @@ import { RotateCcw, LogOut, User } from "lucide-react";
 
 export function Header() {
   const { files, reset } = usePdfStore();
-  const { user, logout } = useAuthStore();
+  const { user } = useAuthStore();
+
+  // Logout central: encerra a sessao no oauth2-proxy (cookie wildcard .soarespicon.adv.br).
+  const logout = () => {
+    window.location.href = "/oauth2/sign_out";
+  };
 
   return (
     <header className="bg-gradient-to-r from-[#022340] via-[#025791] to-[#1A7CC5] text-white px-6 py-3 shadow-lg">

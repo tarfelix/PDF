@@ -8,6 +8,10 @@ services:
       - CORS_ORIGINS=${CORS_ORIGINS:-*}
       - TEMP_FILE_TTL_MINUTES=${TEMP_FILE_TTL_MINUTES:-60}
       - MAX_UPLOAD_SIZE_MB=${MAX_UPLOAD_SIZE_MB:-500}
+      # SSO central (oauth2-proxy / M365). Edge injeta X-Auth-Request-*.
+      - ENVIRONMENT=${ENVIRONMENT:-production}
+      - DEV_BYPASS_AUTH=${DEV_BYPASS_AUTH:-}
+      - SSO_EMAIL_ROLE_MAP=${SSO_EMAIL_ROLE_MAP:-}
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')"]
       interval: 30s

@@ -1,19 +1,15 @@
 const BASE = "/api";
 
-function getAuthHeader(): Record<string, string> {
-  const token = localStorage.getItem("pdf-editor-token");
-  return token ? { Authorization: `Bearer ${token}` } : {};
+// SSO central: sessao no cookie (mesma origem). Em 401 a sessao expirou ->
+// recarrega; o edge (oauth2-proxy) redireciona pro login M365.
+function handleUnauthorized(): never {
+  window.location.reload();
+  throw new Error("Sessão expirada — redirecionando para o login");
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const headers = { ...getAuthHeader(), ...init?.headers };
-  const res = await fetch(`${BASE}${path}`, { ...init, headers });
-  if (res.status === 401) {
-    localStorage.removeItem("pdf-editor-token");
-    localStorage.removeItem("pdf-editor-user");
-    window.location.reload();
-    throw new Error("Sessão expirada");
-  }
+  const res = await fetch(`${BASE}${path}`, { ...init });
+  if (res.status === 401) handleUnauthorized();
   if (!res.ok) {
     const body = await res.json().catch(() => ({ detail: res.statusText }));
     throw new Error(body.detail || `HTTP ${res.status}`);
@@ -21,26 +17,16 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return res.json() as Promise<T>;
 }
 
-// --- Auth ---
+// --- Auth (SSO central) ---
 
-export interface LoginResult {
-  token: string;
+export interface MeResult {
   name: string;
   email: string;
   role: string;
 }
 
-export async function login(body: { email: string; password: string }): Promise<LoginResult> {
-  const res = await fetch(`${BASE}/login`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-  if (!res.ok) {
-    const data = await res.json().catch(() => ({ detail: "Erro ao fazer login" }));
-    throw new Error(data.detail || `HTTP ${res.status}`);
-  }
-  return res.json();
+export async function getMe(): Promise<MeResult> {
+  return request<MeResult>("/me");
 }
 
 export interface UploadResult {
@@ -211,9 +197,10 @@ export async function scan(fileId: string) {
 export async function diff(body: { file_id_a: string; file_id_b: string }) {
   const res = await fetch(`${BASE}/diff`, {
     method: "POST",
-    headers: { "Content-Type": "application/json", ...getAuthHeader() },
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
+  if (res.status === 401) handleUnauthorized();
   if (!res.ok) throw new Error("Falha ao comparar PDFs");
   return res.text();
 }

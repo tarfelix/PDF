@@ -1,11 +1,11 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Header } from "@/components/layout/Header";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { FileUpload } from "@/components/layout/FileUpload";
 import { Onboarding } from "@/components/onboarding/Onboarding";
-import { LoginPage } from "@/components/auth/LoginPage";
 import { usePdfStore } from "@/stores/pdf-store";
 import { useAuthStore } from "@/stores/auth-store";
+import { getMe } from "@/api/client";
 import { HelpCircle } from "lucide-react";
 
 import { LegalScanTool } from "@/components/tools/LegalScanTool";
@@ -38,8 +38,16 @@ const ONBOARDING_KEY = "pdf-editor-onboarding-done";
 
 export default function App() {
   const { activeTool } = usePdfStore();
-  const { token } = useAuthStore();
+  const { user, ready, setUser } = useAuthStore();
   const ActiveComponent = TOOL_COMPONENTS[activeTool];
+
+  // SSO central: o edge (oauth2-proxy) ja garantiu o login antes da SPA carregar.
+  // Aqui so buscamos quem e o usuario corrente. Em 401, client.ts recarrega.
+  useEffect(() => {
+    getMe()
+      .then(setUser)
+      .catch(() => setUser(null));
+  }, [setUser]);
 
   const [showOnboarding, setShowOnboarding] = useState(() => {
     return !localStorage.getItem(ONBOARDING_KEY);
@@ -54,8 +62,29 @@ export default function App() {
     setShowOnboarding(true);
   };
 
-  if (!token) {
-    return <LoginPage />;
+  if (!ready) {
+    return (
+      <div className="h-screen flex items-center justify-center bg-[#f0f4f8] text-[#025791] text-sm">
+        Verificando acesso…
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div className="h-screen flex flex-col items-center justify-center bg-[#f0f4f8] text-center px-6">
+        <p className="text-[#022340] font-semibold">Sessão não autenticada</p>
+        <p className="text-sm text-slate-500 mt-1">
+          Recarregue a página para entrar via SSO (Microsoft 365).
+        </p>
+        <button
+          onClick={() => window.location.reload()}
+          className="mt-4 px-4 py-2 text-sm rounded-md bg-[#025791] text-white hover:bg-[#022340]"
+        >
+          Entrar
+        </button>
+      </div>
+    );
   }
 
   return (
