@@ -8,6 +8,10 @@ services:
       - CORS_ORIGINS=${CORS_ORIGINS:-*}
       - TEMP_FILE_TTL_MINUTES=${TEMP_FILE_TTL_MINUTES:-60}
       - MAX_UPLOAD_SIZE_MB=${MAX_UPLOAD_SIZE_MB:-500}
+      # SSO central (oauth2-proxy / M365). Edge injeta X-Auth-Request-*.
+      - ENVIRONMENT=${ENVIRONMENT:-production}
+      - DEV_BYPASS_AUTH=${DEV_BYPASS_AUTH:-}
+      - SSO_EMAIL_ROLE_MAP=${SSO_EMAIL_ROLE_MAP:-}
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')"]
       interval: 30s
@@ -17,6 +21,14 @@ services:
       - pdf-temp:/app/tmp
     networks:
       - coolify
+    labels:
+      # SSO central: forwardauth -> oauth2-proxy (M365). Injeta X-Auth-Request-*.
+      # Aditivo aos labels auto-gerados pelo Coolify (router = app uuid). Anexa o
+      # middleware ao router https primario; mantem gzip.
+      - traefik.http.middlewares.pdf-sso.forwardauth.address=https://auth.soarespicon.adv.br/oauth2/auth
+      - traefik.http.middlewares.pdf-sso.forwardauth.trustForwardHeader=true
+      - traefik.http.middlewares.pdf-sso.forwardauth.authResponseHeaders=X-Auth-Request-Email,X-Auth-Request-User,X-Auth-Request-Groups,X-Auth-Request-Preferred-Username
+      - traefik.http.routers.https-0-lkw80404ss40w088s8gkww08.middlewares=gzip,pdf-sso
 
 volumes:
   pdf-temp:
