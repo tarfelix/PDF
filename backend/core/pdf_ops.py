@@ -3,10 +3,85 @@ from typing import List, Optional, Tuple, Any, Dict
 from core.utils import insert_pages
 
 
+# Filtros que já são eficientes (ou não-foto) — recomprimir em JPEG pioraria.
+_SKIP_IMAGE_FILTERS = {"CCITTFaxDecode", "JBIG2Decode", "JPXDecode"}
+
+
+def recompress_images(doc: fitz.Document, jpeg_quality: int = 75, max_dim: int = 1700) -> int:
+    """Reamostra e reencoda em JPEG as imagens grandes do documento.
+
+    O `deflate` do PyMuPDF não reduz imagens já comprimidas (JPEG). Em PDFs
+    escaneados as imagens dominam o tamanho, então a única forma de reduzir é
+    recomprimir/reamostrar. Preserva texto e estrutura — só troca os streams
+    de imagem. Retorna a quantidade de imagens efetivamente recomprimidas.
+    """
+    replaced = 0
+    seen: set = set()
+    for page in doc:
+        for img in page.get_images(full=True):
+            xref = img[0]
+            if xref in seen:
+                continue
+            seen.add(xref)
+
+            bpc = img[4]
+            img_filter = img[8]
+            # Pula imagens 1-bit (fax/preto-e-branco) e formatos já eficientes.
+            if bpc == 1 or img_filter in _SKIP_IMAGE_FILTERS:
+                continue
+
+            try:
+                old_len = len(doc.xref_stream_raw(xref) or b"")
+            except Exception:
+                old_len = 0
+
+            try:
+                pix = fitz.Pixmap(doc, xref)
+            except Exception:
+                continue
+
+            try:
+                # Normaliza CMYK/alpha para RGB (JPEG não suporta alpha/CMYK aqui).
+                if pix.alpha or (pix.colorspace is not None and pix.n - pix.alpha >= 4):
+                    pix = fitz.Pixmap(fitz.csRGB, pix)
+
+                # Reamostra reduzindo pela metade até caber em max_dim (shrink só halva).
+                while max(pix.width, pix.height) > max_dim and pix.width > 4 and pix.height > 4:
+                    pix.shrink(1)
+
+                new_bytes = pix.tobytes("jpeg", jpg_quality=jpeg_quality)
+            except Exception:
+                pix = None
+                continue
+            finally:
+                pix = None
+
+            # Só substitui se realmente reduzir.
+            if old_len and len(new_bytes) >= old_len:
+                continue
+
+            try:
+                page.replace_image(xref, stream=new_bytes)
+                replaced += 1
+            except Exception:
+                continue
+
+    return replaced
+
+
 def optimize_pdf(doc: fitz.Document, options: Optional[Dict[str, Any]] = None) -> bytes:
     """Salva o documento com opções de otimização."""
     if options is None:
         options = {}
+    options = dict(options)
+
+    # Recompressão de imagens (separada das opções de save do PyMuPDF).
+    recompress = options.pop("recompress_images", False)
+    jpeg_quality = options.pop("jpeg_quality", 75)
+    max_dim = options.pop("max_image_dim", 1700)
+    if recompress:
+        recompress_images(doc, jpeg_quality=jpeg_quality, max_dim=max_dim)
+
     save_opts: Dict[str, Any] = dict(garbage=4, deflate=True, clean=True)
     save_opts.update(options)
     # MuPDF removeu suporte a linearização ("Linearisation is no longer supported").
