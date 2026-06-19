@@ -11,9 +11,18 @@ from config import ENCRYPT_AES_256, PERM_PRINT, PERM_COPY, PERM_ANNOTATE
 router = APIRouter(tags=["optimize"])
 
 PROFILES = {
-    "light": {"garbage": 2, "deflate": True, "clean": True},
-    "recommended": {"garbage": 3, "deflate": True, "clean": True, "deflate_images": True, "deflate_fonts": True},
-    "maximum": {"garbage": 4, "deflate": True, "clean": True, "deflate_images": True, "deflate_fonts": True},
+    "light": {
+        "garbage": 2, "deflate": True, "clean": True,
+        "recompress_images": True, "jpeg_quality": 85, "max_image_dim": 2200,
+    },
+    "recommended": {
+        "garbage": 3, "deflate": True, "clean": True, "deflate_images": True, "deflate_fonts": True,
+        "recompress_images": True, "jpeg_quality": 75, "max_image_dim": 1700,
+    },
+    "maximum": {
+        "garbage": 4, "deflate": True, "clean": True, "deflate_images": True, "deflate_fonts": True,
+        "recompress_images": True, "jpeg_quality": 60, "max_image_dim": 1240,
+    },
 }
 
 
