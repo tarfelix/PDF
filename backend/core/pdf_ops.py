@@ -9,6 +9,8 @@ def optimize_pdf(doc: fitz.Document, options: Optional[Dict[str, Any]] = None) -
         options = {}
     save_opts: Dict[str, Any] = dict(garbage=4, deflate=True, clean=True)
     save_opts.update(options)
+    # MuPDF removeu suporte a linearização ("Linearisation is no longer supported").
+    save_opts.pop("linear", None)
     return doc.tobytes(**save_opts)
 
 
