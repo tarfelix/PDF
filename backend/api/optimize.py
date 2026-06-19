@@ -13,7 +13,7 @@ router = APIRouter(tags=["optimize"])
 PROFILES = {
     "light": {"garbage": 2, "deflate": True, "clean": True},
     "recommended": {"garbage": 3, "deflate": True, "clean": True, "deflate_images": True, "deflate_fonts": True},
-    "maximum": {"garbage": 4, "deflate": True, "clean": True, "deflate_images": True, "deflate_fonts": True, "linear": True},
+    "maximum": {"garbage": 4, "deflate": True, "clean": True, "deflate_images": True, "deflate_fonts": True},
 }
 
 
