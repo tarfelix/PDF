@@ -5,9 +5,19 @@ a sessao M365 e injeta os headers `X-Auth-Request-*`. Este modulo APENAS os le
 (fail-closed). Espelha o kit do lancador-sp-apps (app/auth/headers.py + roles.py).
 
 Login local foi REMOVIDO (JWT hardcoded + users.json) — a unica porta agora e o SSO.
+
+Anti-spoof (WP-SEC2): o container escuta na rede `coolify` compartilhada com
+dezenas de apps, entao X-Auth-Request-Email sozinho e forjavel por qualquer
+vizinho falando direto com :8000, contornando o oauth2-proxy/Traefik
+inteiramente. Quando PROXY_SHARED_SECRET esta setado, o Traefik injeta
+X-Proxy-Secret (customRequestHeaders via @file) no router protegido do PDF e
+aqui exigimos o match ANTES de confiar em qualquer header de identidade —
+requisicao que nao passou pelo proxy recebe 401. Env vazia = comportamento
+antigo (dev/local sem proxy). Mesma mecanica do sp-copiloto/laudo/sp-painel-prazos.
 """
 from __future__ import annotations
 
+import hmac
 import logging
 import os
 
@@ -65,10 +75,22 @@ async def get_current_user(
     email: str | None = Header(None, alias="X-Auth-Request-Email"),
     oid: str | None = Header(None, alias="X-Auth-Request-User"),
     preferred: str | None = Header(None, alias="X-Auth-Request-Preferred-Username"),
+    proxy_secret: str | None = Header(None, alias="X-Proxy-Secret"),
 ) -> dict:
     """Le os headers do oauth2-proxy -> {email, name, role}. 401 se ausentes."""
     if DEV_BYPASS_AUTH and not email:
         return {"email": "dev@soarespicon.adv.br", "name": "Dev (bypass)", "role": "admin"}
+
+    # Anti-spoof (WP-SEC2): exige o segredo injetado pelo Traefik ANTES de
+    # confiar em qualquer header de identidade. Roda mesmo se `email` vier
+    # vazio, para nao vazar info sobre o estado do gate.
+    secret = os.environ.get("PROXY_SHARED_SECRET", "")
+    if secret and not (proxy_secret and hmac.compare_digest(proxy_secret, secret)):
+        raise HTTPException(
+            status_code=401,
+            detail="A requisição não passou pelo proxy",
+        )
+
     if not email:
         # oauth2-proxy upstream nao configurado/headers ausentes -> 401 explicito.
         raise HTTPException(

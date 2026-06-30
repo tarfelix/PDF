@@ -12,6 +12,10 @@ services:
       - ENVIRONMENT=${ENVIRONMENT:-production}
       - DEV_BYPASS_AUTH=${DEV_BYPASS_AUTH:-}
       - SSO_EMAIL_ROLE_MAP=${SSO_EMAIL_ROLE_MAP:-}
+      # Anti-spoof (WP-SEC2): o Traefik injeta X-Proxy-Secret no router protegido
+      # e o backend exige o match (vizinhos da rede coolify nao conseguem forjar
+      # X-Auth-Request-Email falando direto com o container). Vazio = sem gate.
+      - PROXY_SHARED_SECRET=${PROXY_SHARED_SECRET:-}
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')"]
       interval: 30s
@@ -28,7 +32,13 @@ services:
       - traefik.http.middlewares.pdf-sso.forwardauth.address=https://auth.soarespicon.adv.br/oauth2/auth
       - traefik.http.middlewares.pdf-sso.forwardauth.trustForwardHeader=true
       - traefik.http.middlewares.pdf-sso.forwardauth.authResponseHeaders=X-Auth-Request-Email,X-Auth-Request-User,X-Auth-Request-Groups,X-Auth-Request-Preferred-Username
-      - traefik.http.routers.https-0-lkw80404ss40w088s8gkww08.middlewares=gzip,pdf-sso
+      # Anti-spoof (WP-SEC2): o middleware que injeta X-Proxy-Secret e definido NO
+      # FILE PROVIDER do Traefik (pdf-proxysecret@file), porque o Coolify NAO
+      # interpola variaveis em labels — o secret ficaria literal no compose
+      # versionado. O arquivo dynamic (ex.
+      # /data/coolify/proxy/dynamic/pdf-proxysecret.yaml) mora no servidor, fora
+      # do git — mesmo padrao do sp-copiloto/laudo/sp-painel-prazos.
+      - traefik.http.routers.https-0-lkw80404ss40w088s8gkww08.middlewares=gzip,pdf-sso,pdf-proxysecret@file
 
 volumes:
   pdf-temp:
