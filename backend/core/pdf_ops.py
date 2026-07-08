@@ -94,7 +94,7 @@ def rotate_pages(pdf_bytes: bytes, rotations: Dict[int, int], optimize: bool = T
     doc = fitz.open(stream=pdf_bytes, filetype="pdf")
     for page_idx, angle in rotations.items():
         if 0 <= page_idx < doc.page_count:
-            doc[page_idx].set_rotation(-angle)
+            doc[page_idx].set_rotation(angle)
     opts: Dict[str, Any] = {"deflate_images": optimize, "deflate_fonts": optimize}
     return optimize_pdf(doc, opts)
 
