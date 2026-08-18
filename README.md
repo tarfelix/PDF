@@ -42,9 +42,16 @@ O frontend roda em `http://localhost:5173` e faz proxy de `/api` para o backend 
 # Build e teste local
 docker compose build
 docker compose up
-
-# Produção: usar docker-compose.coolify.yml no Coolify
 ```
+
+Em produção, o Coolify usa o `docker-compose.yml` da raiz (campo
+`docker_compose_location` da aplicação aponta para `/docker-compose.yml`).
+A configuração de roteamento Traefik (chains, SSO, proxy secret) vive em
+`custom_labels` da aplicação no Coolify, e as variáveis de ambiente reais
+(`PROXY_SHARED_SECRET`, `SSO_EMAIL_ROLE_MAP`, `DEV_BYPASS_AUTH` etc.) vêm da
+seção "Environment Variables" do Coolify — nenhuma das duas vem de um arquivo
+versionado neste repo. Para inspecionar ou alterar o comportamento real de
+produção, use a API/UI do Coolify, não um compose local.
 
 ## Variáveis de ambiente
 
